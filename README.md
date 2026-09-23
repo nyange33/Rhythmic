@@ -1,78 +1,69 @@
-# React + TypeScript + Vite
+<div align="center">
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+# Rhythmic
 
-Currently, two official plugins are available:
+**Стриминговая платформа для музыки — для слушателей и артистов**
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](https://react.dev/)
+[![Vite](https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
+[![Tailwind](https://img.shields.io/badge/Tailwind-0F172A?style=for-the-badge&logo=tailwindcss&logoColor=38BDF8)](https://tailwindcss.com/)
+[![Go](https://img.shields.io/badge/Go-0B3D2E?style=for-the-badge&logo=go&logoColor=white)](https://go.dev/)
 
-## React Compiler
+</div>
 
-The React Compiler is enabled on this template. See [this documentation](https://react.dev/learn/react-compiler) for more information.
+---
 
-Note: This will impact Vite dev & build performances.
-You can also try [the experimental native React Compiler support in plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md#rust-react-compiler) by using `compiler: true` in the plugin options instead of using the Babel plugin.
+## О проекте
 
-## Expanding the ESLint configuration
+**Rhythmic** — это веб-платформа для прослушивания музыки с полноценной поддержкой двух ролей: **слушателя** и **артиста**. Проект задуман как пространство, где музыканты публикуют свои треки, а слушатели собирают коллекции, подписываются на исполнителей и открывают для себя новое через чарты и рекомендации.
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+Интерфейс построен в строгой тёмной палитре — глубокий чёрный с акцентами тёмно-зелёного. Никакого визуального шума: только музыка, обложки и управление воспроизведением.
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+---
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## Возможности
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### Для слушателей
 
-```
+- **Плейлисты** — создание, редактирование и быстрое добавление треков в любой момент
+- **Лайки** — отметка понравившихся треков и формирование персональной библиотеки
+- **Подписки** — слежение за любимыми артистами и их новыми релизами
+- **Комментарии** — обсуждение треков под плеером
+- **Топ-100** — глобальный чарт по количеству лайков за всё время
+- **Эквалайзер** — встроенная тонкая настройка звучания прямо в браузере
 
-You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
+### Для артистов
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+- **Личный кабинет** — управление релизами, альбомами и треками
+- **Страница артиста** — публичный профиль с топом песен и полной дискографией
+- **Статистика** — прослушивания, лайки, комментарии по каждому треку
+- **Загрузка музыки** — публикация новых работ без посредников
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### Общее
 
-```
+- **Два типа аккаунта** — выбор роли при регистрации, разный интерфейс под каждую
+- **Поиск** — по трекам, артистам, плейлистам и альбомам
+- **Плеер** — управление очередью, громкость, прогресс, переход на страницу артиста
+- **Адаптивная вёрстка** — от широких мониторов до планшетов
+
+---
+
+## Стек
+
+**Фронтенд**
+
+- TypeScript — типизация на всём протяжении
+- React — компонентный UI
+- Vite — мгновенная сборка и HMR
+- Tailwind CSS v4 — утилитарные стили и тема
+- React Router — навигация между страницами
+- Lucide React — иконки
+
+**Бэкенд**
+
+- Go — REST API, авторизация, работа с медиа и базой данных
+
+---
+
+## Структура
