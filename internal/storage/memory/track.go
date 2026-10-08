@@ -77,6 +77,37 @@ func (s *TrackStore) GetByArtistID(artistID string) ([]models.Track, error) {
 	return tracks, nil
 }
 
+func (s *TrackStore) Update(id string, updated models.Track) (models.Track, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	existing, ok := s.byID[id]
+	if !ok {
+		return models.Track{}, storage.ErrNotFound
+	}
+
+	// If artist ID changed, update index
+	if existing.ArtistID != updated.ArtistID {
+		// Remove from old artist index
+		oldIDs := s.byArtist[existing.ArtistID]
+		for i, trackID := range oldIDs {
+			if trackID == id {
+				s.byArtist[existing.ArtistID] = append(oldIDs[:i], oldIDs[i+1:]...)
+				break
+			}
+		}
+		// Add to new artist index
+		s.byArtist[updated.ArtistID] = append(s.byArtist[updated.ArtistID], id)
+	}
+
+	updated.ID = id
+	updated.CreatedAt = existing.CreatedAt
+	updated.UpdatedAt = time.Now().UTC()
+
+	s.byID[id] = updated
+	return updated, nil
+}
+
 func (s *TrackStore) Delete(id string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
