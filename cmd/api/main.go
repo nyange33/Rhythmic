@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"Rhythmic/internal/modules/auth"
+	"Rhythmic/internal/modules/tracks"
 	"Rhythmic/internal/storage/memory"
 
 	"github.com/gin-gonic/gin"
@@ -13,12 +14,15 @@ import (
 func main() {
 	users := memory.NewUserStore()
 	sessions := memory.NewSessionStore()
+	tracks := memory.NewTrackStore()
 	authSvc := auth.NewService(users, sessions)
+	tracksSvc := tracks.NewService(tracks)
 
 	r := gin.Default()
 	api := r.Group("/api")
 	auth.RegisterRoutes(api, authSvc)
 	auth.RegisterUserRoutes(api, authSvc)
+	tracks.RegisterRoutes(api, tracksSvc)
 
 	addr := ":8090"
 	if p := os.Getenv("PORT"); p != "" {
