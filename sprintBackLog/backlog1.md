@@ -24,6 +24,11 @@
      sprintBackLog/playlist-page-mockup.jpg
    - отпуск| неделя | юсуф 
    
-   - передача треков с бд на фронт | 2 | михаил
-   
+   - создание модели Track в internal/models | 1 | михаил
+   - создание TrackRepository интерфейса в internal/storage | 0.5 | михаил
+   - реализация memory storage для tracks | 1.5 | михаил
+   - создание DTO для tracks в internal/modules/tracks | 0.5 | михаил
+   - создание handler для tracks с API endpoints | 2 | михаил
+   - регистрация роутов tracks в main.go | 0.5 | михаил
+
    
