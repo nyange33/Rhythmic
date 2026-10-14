@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AudioEngine } from "../audio/AudioEngine";
+import { AudioEngine } from "../audio/audioEngine";
 import type { Track } from "../types/track";
 
 export function useAudioPlayer(tracks: Track[]) {

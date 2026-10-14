@@ -35,7 +35,7 @@ function ProfileAvatar() {
 
   return (
     <div className="relative h-32 w-32 shrink-0 sm:h-40 sm:w-40">
-      <div className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-full border-4 border-[#090c0a] bg-gradient-to-br from-emerald-400 via-green-500 to-teal-700">
+      <div className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-full border-4 border-[#242424] bg-gradient-to-br from-pink-400 via-stone-500 to-pink-700">
         {src ? (
           <img
             src={src}
@@ -103,7 +103,7 @@ function Waveform({ active }: { active: boolean }) {
       {[18, 27, 12, 32, 24, 38, 20, 30, 14, 26, 35, 18, 28, 22, 38].map((height, index) => (
         <span
           key={index}
-          className={`w-[3px] rounded-full transition-colors ${active && index < 8 ? "bg-emerald-400" : "bg-white/[0.09]"}`}
+          className={`w-[3px] rounded-full transition-colors ${active && index < 8 ? "bg-pink-400" : "bg-white/[0.09]"}`}
           style={{ height }}
         />
       ))}
@@ -140,28 +140,28 @@ export default function ProfilePage({
     <div className="text-white">
       <main className="mx-auto max-w-[1450px] px-5 pb-20 lg:px-8">
         <section className="relative overflow-hidden border-b border-white/[0.05] py-10 lg:py-14">
-          <div className="pointer-events-none absolute -right-20 -top-40 h-[500px] w-[500px] rounded-full bg-emerald-400/[0.06] blur-3xl" />
+          <div className="pointer-events-none absolute -right-20 -top-40 h-[500px] w-[500px] rounded-full bg-pink-400/[0.06] blur-3xl" />
 
           <div className="relative flex flex-col gap-8 sm:flex-row sm:items-end">
             <ProfileAvatar />
 
             <div className="min-w-0 flex-1">
-              <div className="mb-3 inline-flex rounded-full border border-emerald-400/10 bg-emerald-400/[0.06] px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.18em] text-emerald-400">
+              <div className="mb-3 inline-flex rounded-full border border-pink-400/10 bg-pink-400/[0.06] px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.18em] text-pink-400">
                 Artist
               </div>
 
               <h1 className="text-4xl font-bold tracking-[-0.04em] sm:text-5xl lg:text-6xl">
-                королевски 17<span className="text-emerald-400">.</span>
+                королевски 17<span className="text-pink-400">.</span>
               </h1>
 
               <p className="mt-3 max-w-xl text-sm leading-6 text-zinc-500">
-                королевске 17 лет
+                Electronic artist creating sounds for late nights, empty roads and everything in between.
               </p>
 
               <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-[11px] text-zinc-600">
-                <span className="flex items-center gap-1.5"><MapPin size={13} /> Moscow, Russia</span>
-                <span className="flex items-center gap-1.5"><CalendarDays size={13} /> Joined 2021</span>
-                <span className="flex items-center gap-1.5"><Globe2 size={13} /> blank.music</span>
+                <span className="flex items-center gap-1.5"><MapPin size={13} /> Berlin, Germany</span>
+                <span className="flex items-center gap-1.5"><CalendarDays size={13} /> Joined 2023</span>
+                <span className="flex items-center gap-1.5"><Globe2 size={13} /> korolevskiy.music</span>
               </div>
             </div>
 
@@ -169,7 +169,7 @@ export default function ProfilePage({
               <button
                 onClick={() => setFollowing((value) => !value)}
                 className={`flex items-center gap-2 rounded-xl px-5 py-3 text-xs font-semibold transition ${
-                  following ? "border border-emerald-400/20 bg-emerald-400/10 text-emerald-400" : "bg-emerald-400 text-black hover:bg-emerald-300"
+                  following ? "border border-pink-400/20 bg-pink-400/10 text-pink-400" : "bg-pink-400 text-black hover:bg-pink-300"
                 }`}
               >
                 {following ? <><Check size={15} /> Following</> : <><UserPlus size={15} /> Follow</>}
@@ -203,7 +203,7 @@ export default function ProfilePage({
                   className={`relative flex items-center gap-2 pb-4 text-xs font-medium transition ${activeTab === tab.id ? "text-white" : "text-zinc-600 hover:text-zinc-300"}`}
                 >
                   <Icon size={15} /> {tab.label}
-                  {activeTab === tab.id && <span className="absolute bottom-[-1px] left-0 right-0 h-[2px] rounded-full bg-emerald-400" />}
+                  {activeTab === tab.id && <span className="absolute bottom-[-1px] left-0 right-0 h-[2px] rounded-full bg-pink-400" />}
                 </button>
               );
             })}
@@ -213,7 +213,7 @@ export default function ProfilePage({
             <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_320px]">
               <div>
                 <div className="mb-5">
-                  <p className="text-[10px] uppercase tracking-[0.18em] text-emerald-400">Your releases</p>
+                  <p className="text-[10px] uppercase tracking-[0.18em] text-pink-400">Your releases</p>
                   <h2 className="mt-2 text-2xl font-bold tracking-tight">Tracks</h2>
                 </div>
 
@@ -225,7 +225,7 @@ export default function ProfilePage({
                     return (
                       <div
                         key={track.id}
-                        className={`group flex items-center gap-4 rounded-2xl border p-3 transition ${active ? "border-emerald-400/15 bg-emerald-400/[0.045]" : "border-transparent hover:border-white/[0.06] hover:bg-white/[0.025]"}`}
+                        className={`group flex items-center gap-4 rounded-2xl border p-3 transition ${active ? "border-pink-400/15 bg-pink-400/[0.045]" : "border-transparent hover:border-white/[0.06] hover:bg-white/[0.025]"}`}
                       >
                         <span className="w-5 text-center text-[10px] tabular-nums text-zinc-700">
                           {String(index + 1).padStart(2, "0")}
@@ -251,7 +251,7 @@ export default function ProfilePage({
 
                         <button
                           onClick={() => toggleLike(track.id)}
-                          className={`rounded-lg p-2 transition ${liked ? "text-emerald-400" : "text-zinc-700 hover:text-white"}`}
+                          className={`rounded-lg p-2 transition ${liked ? "text-pink-400" : "text-zinc-700 hover:text-white"}`}
                         >
                           <Heart size={16} fill={liked ? "currentColor" : "none"} />
                         </button>
@@ -264,7 +264,7 @@ export default function ProfilePage({
               </div>
 
               <aside className="rounded-3xl border border-white/[0.06] bg-white/[0.02] p-6">
-                <p className="text-[10px] uppercase tracking-[0.18em] text-emerald-400">About the artist</p>
+                <p className="text-[10px] uppercase tracking-[0.18em] text-pink-400">About the artist</p>
                 <h3 className="mt-3 text-xl font-bold">королевски 17</h3>
                 <p className="mt-3 text-sm leading-6 text-zinc-500">
                   что-то там что-то там троллфейс XVII психотераперв инструмент как наркодиле
@@ -277,7 +277,7 @@ export default function ProfilePage({
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {["что-то там", "playlist", "w w w"].map((title, index) => (
                 <div key={title} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5">
-                  <div className={`mb-6 h-24 rounded-xl bg-gradient-to-br ${["from-emerald-400 to-cyan-500", "from-lime-400 to-green-700", "from-teal-400 to-emerald-700"][index]}`} />
+                  <div className={`mb-6 h-24 rounded-xl bg-gradient-to-br ${["from-pink-400 to-pink-600", "from-pink-400 to-stone-700", "from-pink-400 to-pink-700"][index]}`} />
                   <p className="font-semibold">{title}</p>
                   <p className="mt-1 text-xs text-zinc-600">{tracks.length} tracks</p>
                 </div>
@@ -288,7 +288,7 @@ export default function ProfilePage({
           {activeTab === "about" && (
             <div className="max-w-2xl rounded-3xl border border-white/[0.06] bg-white/[0.02] p-7">
               <p className="text-sm leading-7 text-zinc-500">
-                королевски 17.
+                королевски 17 is an artist profile connected to the same track catalog and audio player used on the home page.
               </p>
             </div>
           )}

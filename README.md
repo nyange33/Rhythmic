@@ -12,3 +12,21 @@
 
 </div>
 
+
+
+## Rhythmic UI updates
+
+The interface uses a graphite base palette with gold accents. Added frontend pages for Library, Liked Tracks, Notifications, and Playlists / Albums. Collection data and liked track IDs are saved in the browser's localStorage. The upload dialog supports choosing one audio file for a single or multiple files for an album; publishing files to a shared server requires connecting an upload endpoint/backend. Notifications display playback errors and a placeholder for new releases from followed artists; artist subscriptions and server-pushed release notifications require backend support.
+
+Start locally:
+
+```bash
+npm install
+npm run dev
+```
+
+### Source layout
+
+- `src/components/pages/CollectionPages.tsx` — Library, Liked Tracks, Notifications, and Playlists / Albums pages.
+- `src/components/dialogs/MusicDialogs.tsx` — create-collection and upload-music dialogs.
+- `src/components/MusicComponents.tsx` — shared cover, navigation, waveform, and track-row components.
