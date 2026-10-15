@@ -1,6 +1,7 @@
 package memory
 
 import (
+	"strings"
 	"sync"
 	"time"
 
@@ -106,6 +107,41 @@ func (s *TrackStore) Update(id string, updated models.Track) (models.Track, erro
 
 	s.byID[id] = updated
 	return updated, nil
+}
+
+func (s *TrackStore) Search(query string) ([]models.Track, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if query == "" {
+		return s.GetAll()
+	}
+
+	query = strings.ToLower(query)
+	results := []models.Track{}
+
+	for _, track := range s.byID {
+		if strings.Contains(strings.ToLower(track.Title), query) ||
+			strings.Contains(strings.ToLower(track.Artist), query) ||
+			strings.Contains(strings.ToLower(track.Album), query) {
+			results = append(results, track)
+		}
+	}
+
+	return results, nil
+}
+
+func (s *TrackStore) GetByIDs(ids []string) ([]models.Track, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	tracks := make([]models.Track, 0, len(ids))
+	for _, id := range ids {
+		if track, ok := s.byID[id]; ok {
+			tracks = append(tracks, track)
+		}
+	}
+	return tracks, nil
 }
 
 func (s *TrackStore) Delete(id string) error {

@@ -21,6 +21,7 @@ func NewService(tracks storage.TrackRepository) *Service {
 func RegisterRoutes(rg *gin.RouterGroup, svc *Service) {
 	g := rg.Group("/tracks")
 	g.GET("", func(c *gin.Context) { handleGetAllTracks(c, svc) })
+	g.GET("/search", func(c *gin.Context) { handleSearchTracks(c, svc) })
 	g.GET("/:id", func(c *gin.Context) { handleGetTrack(c, svc) })
 	g.POST("", func(c *gin.Context) { handleCreateTrack(c, svc) })
 	g.PUT("/:id", func(c *gin.Context) { handleUpdateTrack(c, svc) })
@@ -32,6 +33,16 @@ func handleGetAllTracks(c *gin.Context, svc *Service) {
 	tracks, err := svc.GetAll()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get tracks"})
+		return
+	}
+	c.JSON(http.StatusOK, tracks)
+}
+
+func handleSearchTracks(c *gin.Context, svc *Service) {
+	query := c.Query("q")
+	tracks, err := svc.Search(query)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to search tracks"})
 		return
 	}
 	c.JSON(http.StatusOK, tracks)
@@ -106,6 +117,18 @@ func handleGetTracksByArtist(c *gin.Context, svc *Service) {
 
 func (s *Service) GetAll() ([]TrackView, error) {
 	tracks, err := s.tracks.GetAll()
+	if err != nil {
+		return nil, err
+	}
+	views := make([]TrackView, len(tracks))
+	for i, track := range tracks {
+		views[i] = toView(track)
+	}
+	return views, nil
+}
+
+func (s *Service) Search(query string) ([]TrackView, error) {
+	tracks, err := s.tracks.Search(query)
 	if err != nil {
 		return nil, err
 	}
