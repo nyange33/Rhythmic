@@ -63,7 +63,7 @@ func handleGetTrack(c *gin.Context, svc *Service) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get track"})
 		return
 	}
-	c.JSON(http.StatusOK, toView(track))
+	c.JSON(http.StatusOK, track)
 }
 
 func handleCreateTrack(c *gin.Context, svc *Service) {
@@ -77,7 +77,7 @@ func handleCreateTrack(c *gin.Context, svc *Service) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create track"})
 		return
 	}
-	c.JSON(http.StatusCreated, toView(track))
+	c.JSON(http.StatusCreated, track)
 }
 
 func handleUploadAudio(c *gin.Context, svc *Service) {
@@ -110,7 +110,7 @@ func handleUploadAudio(c *gin.Context, svc *Service) {
 	}
 
 	format := utils.GetAudioFormat(file.Filename)
-	mp3Data, err := converter.ConvertToMP3FromBytes(inputData, format)
+	_, err = converter.ConvertToMP3FromBytes(inputData, format)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to convert audio"})
 		return
@@ -141,7 +141,7 @@ func handleUpdateTrack(c *gin.Context, svc *Service) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update track"})
 		return
 	}
-	c.JSON(http.StatusOK, toView(track))
+	c.JSON(http.StatusOK, track)
 }
 
 func handleDeleteTrack(c *gin.Context, svc *Service) {

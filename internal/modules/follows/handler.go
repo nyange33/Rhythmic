@@ -82,7 +82,7 @@ func handleCreateFollow(c *gin.Context, svc *Service) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create follow"})
 		return
 	}
-	c.JSON(http.StatusCreated, toView(follow))
+	c.JSON(http.StatusCreated, follow)
 }
 
 func handleDeleteFollow(c *gin.Context, svc *Service) {

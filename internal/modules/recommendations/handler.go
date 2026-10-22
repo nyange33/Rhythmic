@@ -34,7 +34,7 @@ func handleGetRecommendations(c *gin.Context, svc *Service) {
 	limit := 10
 	if l := c.Query("limit"); l != "" {
 		var lim int
-		if _, err := c.BindQuery(&lim); err == nil && lim > 0 && lim <= 50 {
+		if err := c.BindQuery(&lim); err == nil && lim > 0 && lim <= 50 {
 			limit = lim
 		}
 	}
