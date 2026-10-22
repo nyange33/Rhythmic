@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { ArrowRight, Music2, X } from "lucide-react";
-import { login, register } from "../api/auth";
+import { login, register } from "../../api/auth";
 
 export type AuthMode = "signIn" | "signUp";
 
