@@ -18,6 +18,11 @@ type UpdateTrackRequest struct {
 	ArtistID string `json:"artist_id" binding:"omitempty"`
 }
 
+type UploadAudioResponse struct {
+	AudioURL string `json:"audio_url"`
+	Duration int    `json:"duration"`
+}
+
 type TrackView struct {
 	ID        string `json:"id"`
 	Title     string `json:"title"`

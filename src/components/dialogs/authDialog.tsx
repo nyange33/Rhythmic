@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { ArrowRight, Music2, X } from "lucide-react";
+import { login, register } from "@/api/auth";
 
 export type AuthMode = "signIn" | "signUp";
 
@@ -22,9 +23,29 @@ export default function AuthDialog({ open, mode, theme, onModeChange, onClose }:
 
   const isSignUp = mode === "signUp";
 
-  const submit = (event: FormEvent<HTMLFormElement>) => {
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setMessage("Интерфейс готов. Для реального входа и регистрации нужно подключить API авторизации.");
+
+    try {
+      if (isSignUp) {
+        await register({
+          username: login,
+          email,
+          password,
+          role: isArtist ? "artist" : "listener",
+        });
+        setMessage("Регистрация успешна! Теперь войдите в аккаунт.");
+        switchMode("signIn");
+      } else {
+        const response = await login({ email, password });
+        setMessage(`Успешный вход! Токен: ${response.token.substring(0, 20)}...`);
+        // Здесь можно сохранить токен в localStorage или state
+        localStorage.setItem("token", response.token);
+        localStorage.setItem("user", JSON.stringify(response.user));
+      }
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Произошла ошибка");
+    }
   };
 
   const switchMode = (nextMode: AuthMode) => {

@@ -9,4 +9,6 @@ type TrackRepository interface {
 	GetByArtistID(artistID string) ([]models.Track, error)
 	Update(id string, track models.Track) (models.Track, error)
 	Delete(id string) error
+	Search(query string) ([]models.Track, error)
+	GetByIDs(ids []string) ([]models.Track, error)
 }

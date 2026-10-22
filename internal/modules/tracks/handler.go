@@ -1,11 +1,15 @@
 package tracks
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
+	"fmt"
 	"net/http"
 
 	"Rhythmic/internal/models"
 	"Rhythmic/internal/storage"
+	"Rhythmic/internal/utils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -21,17 +25,29 @@ func NewService(tracks storage.TrackRepository) *Service {
 func RegisterRoutes(rg *gin.RouterGroup, svc *Service) {
 	g := rg.Group("/tracks")
 	g.GET("", func(c *gin.Context) { handleGetAllTracks(c, svc) })
+	g.GET("/search", func(c *gin.Context) { handleSearchTracks(c, svc) })
+	g.GET("/artist/:artist_id", func(c *gin.Context) { handleGetTracksByArtist(c, svc) })
 	g.GET("/:id", func(c *gin.Context) { handleGetTrack(c, svc) })
 	g.POST("", func(c *gin.Context) { handleCreateTrack(c, svc) })
+	g.POST("/upload", func(c *gin.Context) { handleUploadAudio(c, svc) })
 	g.PUT("/:id", func(c *gin.Context) { handleUpdateTrack(c, svc) })
 	g.DELETE("/:id", func(c *gin.Context) { handleDeleteTrack(c, svc) })
-	g.GET("/artist/:artist_id", func(c *gin.Context) { handleGetTracksByArtist(c, svc) })
 }
 
 func handleGetAllTracks(c *gin.Context, svc *Service) {
 	tracks, err := svc.GetAll()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get tracks"})
+		return
+	}
+	c.JSON(http.StatusOK, tracks)
+}
+
+func handleSearchTracks(c *gin.Context, svc *Service) {
+	query := c.Query("q")
+	tracks, err := svc.Search(query)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to search tracks"})
 		return
 	}
 	c.JSON(http.StatusOK, tracks)
@@ -62,6 +78,52 @@ func handleCreateTrack(c *gin.Context, svc *Service) {
 		return
 	}
 	c.JSON(http.StatusCreated, toView(track))
+}
+
+func handleUploadAudio(c *gin.Context, svc *Service) {
+	file, err := c.FormFile("audio")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "no audio file provided"})
+		return
+	}
+
+	// Validate file type
+	if !utils.ValidateAudioFile(file.Filename) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid audio format"})
+		return
+	}
+
+	// Open uploaded file
+	src, err := file.Open()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to open file"})
+		return
+	}
+	defer src.Close()
+
+	// Convert to MP3
+	converter := utils.NewAudioConverter()
+	inputData := make([]byte, file.Size)
+	if _, err := src.Read(inputData); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read file"})
+		return
+	}
+
+	format := utils.GetAudioFormat(file.Filename)
+	mp3Data, err := converter.ConvertToMP3FromBytes(inputData, format)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to convert audio"})
+		return
+	}
+
+	// In production, save to cloud storage or local disk
+	// For now, return a mock URL
+	audioURL := fmt.Sprintf("/uploads/tracks/%s.mp3", randomHex(12))
+
+	c.JSON(http.StatusOK, UploadAudioResponse{
+		AudioURL: audioURL,
+		Duration: 0, // Would need to extract actual duration
+	})
 }
 
 func handleUpdateTrack(c *gin.Context, svc *Service) {
@@ -106,6 +168,18 @@ func handleGetTracksByArtist(c *gin.Context, svc *Service) {
 
 func (s *Service) GetAll() ([]TrackView, error) {
 	tracks, err := s.tracks.GetAll()
+	if err != nil {
+		return nil, err
+	}
+	views := make([]TrackView, len(tracks))
+	for i, track := range tracks {
+		views[i] = toView(track)
+	}
+	return views, nil
+}
+
+func (s *Service) Search(query string) ([]TrackView, error) {
+	tracks, err := s.tracks.Search(query)
 	if err != nil {
 		return nil, err
 	}
@@ -199,4 +273,12 @@ func toView(track models.Track) TrackView {
 		ArtistID:  track.ArtistID,
 		CreatedAt: track.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 	}
+}
+
+func randomHex(n int) string {
+	b := make([]byte, n)
+	if _, err := rand.Read(b); err != nil {
+		panic(err)
+	}
+	return hex.EncodeToString(b)
 }

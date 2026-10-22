@@ -658,6 +658,7 @@ export default function App() {
           setPlaylistName("");
           setPlaylistDialog(false);
         }}
+        userId={localStorage.getItem("user") ? JSON.parse(localStorage.getItem("user") || "{}").id : undefined}
       />
 
       <UploadMusicDialog
@@ -673,6 +674,7 @@ export default function App() {
         onFilesChange={setUploadFiles}
         onClose={() => { setUploadOpen(false); setUploadMessage(""); }}
         onSubmit={handleUpload}
+        userId={localStorage.getItem("user") ? JSON.parse(localStorage.getItem("user") || "{}").id : undefined}
       />
 
       
