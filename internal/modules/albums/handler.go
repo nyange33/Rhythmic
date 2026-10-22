@@ -50,7 +50,7 @@ func handleGetAlbum(c *gin.Context, svc *Service) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get album"})
 		return
 	}
-	c.JSON(http.StatusOK, toView(album))
+	c.JSON(http.StatusOK, album)
 }
 
 func handleGetAlbumsByArtist(c *gin.Context, svc *Service) {
@@ -80,7 +80,7 @@ func handleCreateAlbum(c *gin.Context, svc *Service) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create album"})
 		return
 	}
-	c.JSON(http.StatusCreated, toView(album))
+	c.JSON(http.StatusCreated, album)
 }
 
 func handleUpdateAlbum(c *gin.Context, svc *Service) {
@@ -98,7 +98,7 @@ func handleUpdateAlbum(c *gin.Context, svc *Service) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update album"})
 		return
 	}
-	c.JSON(http.StatusOK, toView(album))
+	c.JSON(http.StatusOK, album)
 }
 
 func handleDeleteAlbum(c *gin.Context, svc *Service) {

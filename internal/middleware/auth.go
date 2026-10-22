@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"Rhythmic/internal/modules/auth"
-	"Rhythmic/internal/storage"
 
 	"github.com/gin-gonic/gin"
 )
@@ -33,7 +32,7 @@ func RequireAuth(authSvc *auth.Service) gin.HandlerFunc {
 // RequireRole middleware to check if user has required role
 func RequireRole(role string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		user, exists := c.Get("user")
+		_, exists := c.Get("user")
 		if !exists {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 			return

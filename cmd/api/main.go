@@ -5,13 +5,13 @@ import (
 	"os"
 
 	"Rhythmic/internal/middleware"
-	"Rhythmic/internal/modules/albums"
+	albumsModule "Rhythmic/internal/modules/albums"
 	"Rhythmic/internal/modules/auth"
-	"Rhythmic/internal/modules/follows"
+	followsModule "Rhythmic/internal/modules/follows"
 	"Rhythmic/internal/modules/health"
-	"Rhythmic/internal/modules/playlists"
+	playlistsModule "Rhythmic/internal/modules/playlists"
 	"Rhythmic/internal/modules/recommendations"
-	"Rhythmic/internal/modules/tracks"
+	tracksModule "Rhythmic/internal/modules/tracks"
 	"Rhythmic/internal/storage/memory"
 
 	"github.com/gin-gonic/gin"
@@ -21,19 +21,19 @@ func main() {
 	// Initialize storage
 	users := memory.NewUserStore()
 	sessions := memory.NewSessionStore()
-	tracks := memory.NewTrackStore()
-	playlists := memory.NewPlaylistStore()
-	albums := memory.NewAlbumStore()
-	artists := memory.NewArtistStore()
-	follows := memory.NewFollowStore()
+	trackStore := memory.NewTrackStore()
+	playlistStore := memory.NewPlaylistStore()
+	albumStore := memory.NewAlbumStore()
+	artistStore := memory.NewArtistStore()
+	followStore := memory.NewFollowStore()
 
 	// Initialize services
 	authSvc := auth.NewService(users, sessions)
-	tracksSvc := tracks.NewService(tracks)
-	playlistsSvc := playlists.NewService(playlists)
-	albumsSvc := albums.NewService(albums)
-	followsSvc := follows.NewService(follows, artists)
-	recommendationsSvc := recommendations.NewService(tracks, follows)
+	tracksSvc := tracksModule.NewService(trackStore)
+	playlistsSvc := playlistsModule.NewService(playlistStore)
+	albumsSvc := albumsModule.NewService(albumStore)
+	followsSvc := followsModule.NewService(followStore, artistStore)
+	recommendationsSvc := recommendations.NewService(trackStore, followStore)
 	healthSvc := health.NewService()
 
 	// Setup router
@@ -48,10 +48,10 @@ func main() {
 	health.RegisterRoutes(r, healthSvc)
 	auth.RegisterRoutes(api, authSvc)
 	auth.RegisterUserRoutes(api, authSvc)
-	tracks.RegisterRoutes(api, tracksSvc)
-	playlists.RegisterRoutes(api, playlistsSvc)
-	albums.RegisterRoutes(api, albumsSvc)
-	follows.RegisterRoutes(api, followsSvc)
+	tracksModule.RegisterRoutes(api, tracksSvc)
+	playlistsModule.RegisterRoutes(api, playlistsSvc)
+	albumsModule.RegisterRoutes(api, albumsSvc)
+	followsModule.RegisterRoutes(api, followsSvc)
 	recommendations.RegisterRoutes(api, recommendationsSvc)
 
 	// Server configuration

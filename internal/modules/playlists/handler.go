@@ -53,7 +53,7 @@ func handleGetPlaylist(c *gin.Context, svc *Service) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get playlist"})
 		return
 	}
-	c.JSON(http.StatusOK, toView(playlist))
+	c.JSON(http.StatusOK, playlist)
 }
 
 func handleCreatePlaylist(c *gin.Context, svc *Service) {
@@ -72,7 +72,7 @@ func handleCreatePlaylist(c *gin.Context, svc *Service) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create playlist"})
 		return
 	}
-	c.JSON(http.StatusCreated, toView(playlist))
+	c.JSON(http.StatusCreated, playlist)
 }
 
 func handleUpdatePlaylist(c *gin.Context, svc *Service) {
@@ -90,7 +90,7 @@ func handleUpdatePlaylist(c *gin.Context, svc *Service) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update playlist"})
 		return
 	}
-	c.JSON(http.StatusOK, toView(playlist))
+	c.JSON(http.StatusOK, playlist)
 }
 
 func handleDeletePlaylist(c *gin.Context, svc *Service) {
