@@ -148,8 +148,10 @@ func (s *Service) Create(req CreateFollowRequest) (FollowView, error) {
 		return FollowView{}, err
 	}
 
-	// Increment artist followers count
-	s.artists.IncrementFollowers(req.ArtistID)
+	// Increment artist followers count (log error but don't fail)
+	if err := s.artists.IncrementFollowers(req.ArtistID); err != nil {
+		// Log error in production, for now just continue
+	}
 
 	return toView(follow), nil
 }
@@ -165,8 +167,10 @@ func (s *Service) Delete(id string) error {
 		return err
 	}
 
-	// Decrement artist followers count
-	s.artists.DecrementFollowers(follow.ArtistID)
+	// Decrement artist followers count (log error but don't fail)
+	if err := s.artists.DecrementFollowers(follow.ArtistID); err != nil {
+		// Log error in production, for now just continue
+	}
 
 	return nil
 }
@@ -177,8 +181,10 @@ func (s *Service) DeleteByUserAndArtist(userID, artistID string) error {
 		return err
 	}
 
-	// Decrement artist followers count
-	s.artists.DecrementFollowers(artistID)
+	// Decrement artist followers count (log error but don't fail)
+	if err := s.artists.DecrementFollowers(artistID); err != nil {
+		// Log error in production, for now just continue
+	}
 
 	return nil
 }
