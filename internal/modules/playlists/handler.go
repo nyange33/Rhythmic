@@ -21,8 +21,8 @@ func NewService(playlists storage.PlaylistRepository) *Service {
 func RegisterRoutes(rg *gin.RouterGroup, svc *Service) {
 	g := rg.Group("/playlists")
 	g.GET("", func(c *gin.Context) { handleGetUserPlaylists(c, svc) })
-	g.GET("/:id", func(c *gin.Context) { handleGetPlaylist(c, svc) })
 	g.POST("", func(c *gin.Context) { handleCreatePlaylist(c, svc) })
+	g.GET("/:id", func(c *gin.Context) { handleGetPlaylist(c, svc) })
 	g.PUT("/:id", func(c *gin.Context) { handleUpdatePlaylist(c, svc) })
 	g.DELETE("/:id", func(c *gin.Context) { handleDeletePlaylist(c, svc) })
 	g.POST("/:id/tracks", func(c *gin.Context) { handleAddTrack(c, svc) })

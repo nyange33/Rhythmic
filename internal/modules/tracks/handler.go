@@ -26,12 +26,12 @@ func RegisterRoutes(rg *gin.RouterGroup, svc *Service) {
 	g := rg.Group("/tracks")
 	g.GET("", func(c *gin.Context) { handleGetAllTracks(c, svc) })
 	g.GET("/search", func(c *gin.Context) { handleSearchTracks(c, svc) })
+	g.GET("/artist/:artist_id", func(c *gin.Context) { handleGetTracksByArtist(c, svc) })
 	g.GET("/:id", func(c *gin.Context) { handleGetTrack(c, svc) })
 	g.POST("", func(c *gin.Context) { handleCreateTrack(c, svc) })
 	g.POST("/upload", func(c *gin.Context) { handleUploadAudio(c, svc) })
 	g.PUT("/:id", func(c *gin.Context) { handleUpdateTrack(c, svc) })
 	g.DELETE("/:id", func(c *gin.Context) { handleDeleteTrack(c, svc) })
-	g.GET("/artist/:artist_id", func(c *gin.Context) { handleGetTracksByArtist(c, svc) })
 }
 
 func handleGetAllTracks(c *gin.Context, svc *Service) {

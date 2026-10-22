@@ -22,8 +22,8 @@ func NewService(albums storage.AlbumRepository) *Service {
 func RegisterRoutes(rg *gin.RouterGroup, svc *Service) {
 	g := rg.Group("/albums")
 	g.GET("", func(c *gin.Context) { handleGetAllAlbums(c, svc) })
-	g.GET("/:id", func(c *gin.Context) { handleGetAlbum(c, svc) })
 	g.GET("/artist/:artist_id", func(c *gin.Context) { handleGetAlbumsByArtist(c, svc) })
+	g.GET("/:id", func(c *gin.Context) { handleGetAlbum(c, svc) })
 	g.POST("", func(c *gin.Context) { handleCreateAlbum(c, svc) })
 	g.PUT("/:id", func(c *gin.Context) { handleUpdateAlbum(c, svc) })
 	g.DELETE("/:id", func(c *gin.Context) { handleDeleteAlbum(c, svc) })
