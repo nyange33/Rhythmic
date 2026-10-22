@@ -1,5 +1,8 @@
 import type { FormEvent } from "react";
 import { Disc3, FileAudio, X } from "lucide-react";
+import { createPlaylist } from "@/api/playlists";
+import { createAlbum } from "@/api/albums";
+import { createTrack } from "@/api/tracks";
 
 export type PlaylistType = "Playlist" | "Album";
 export type UploadType = "track" | "album";
@@ -12,14 +15,40 @@ type PlaylistDialogProps = {
   onTypeChange: (value: PlaylistType) => void;
   onClose: () => void;
   onCreate: () => void;
+  userId?: string;
 };
 
-export function PlaylistDialog({ open, name, type, onNameChange, onTypeChange, onClose, onCreate }: PlaylistDialogProps) {
+export function PlaylistDialog({ open, name, type, onNameChange, onTypeChange, onClose, onCreate, userId }: PlaylistDialogProps) {
   if (!open) return null;
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    try {
+      if (type === "Playlist") {
+        if (!userId) {
+          alert("User ID required");
+          return;
+        }
+        await createPlaylist({ name }, userId);
+      } else {
+        // For albums, need artist_id - for now using userId as placeholder
+        await createAlbum({
+          title: name,
+          artist_id: userId || "placeholder",
+          artist_name: "Artist Name",
+          release_date: new Date().toISOString(),
+        });
+      }
+      onCreate();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Failed to create");
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-      <form onSubmit={(event) => { event.preventDefault(); onCreate(); }} className="w-full max-w-md rounded-3xl border border-white/10 bg-[#242424] p-6 shadow-2xl">
+      <form onSubmit={handleSubmit} className="w-full max-w-md rounded-3xl border border-white/10 bg-[#242424] p-6 shadow-2xl">
         <div className="flex items-center justify-between"><h2 className="text-xl font-bold">Create playlist or album</h2><button type="button" onClick={onClose} aria-label="Close" className="text-zinc-500 hover:text-white"><X size={20} /></button></div>
         <label className="mt-6 block text-xs text-zinc-400">Playlist or album</label>
         <div className="mt-2 flex gap-2">
@@ -47,14 +76,38 @@ type UploadDialogProps = {
   onFilesChange: (files: File[]) => void;
   onClose: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  userId?: string;
 };
 
-export function UploadMusicDialog({ open, type, title, artist, files, message, onTypeChange, onTitleChange, onArtistChange, onFilesChange, onClose, onSubmit }: UploadDialogProps) {
+export function UploadMusicDialog({ open, type, title, artist, files, message, onTypeChange, onTitleChange, onArtistChange, onFilesChange, onClose, onSubmit, userId }: UploadDialogProps) {
   if (!open) return null;
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    try {
+      // For now, just call the existing onSubmit
+      // In production, this would upload files and call createTrack/createAlbum
+      if (type === "track" && files.length > 0) {
+        // Placeholder for actual file upload
+        const token = localStorage.getItem("token");
+        await createTrack({
+          title,
+          artist,
+          duration: 180, // placeholder duration
+          audio_url: `/uploads/${files[0].name}`,
+          artist_id: userId || "placeholder",
+        }, token || undefined);
+      }
+      onSubmit(event);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Upload failed");
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-      <form onSubmit={onSubmit} className="w-full max-w-xl rounded-3xl border border-white/10 bg-[#242424] p-6 shadow-2xl">
+      <form onSubmit={handleSubmit} className="w-full max-w-xl rounded-3xl border border-white/10 bg-[#242424] p-6 shadow-2xl">
         <div className="flex items-center justify-between"><div><h2 className="text-xl font-bold">Upload music</h2><p className="mt-1 text-xs text-zinc-500">Добавь трек или выбери файлы альбома</p></div><button type="button" onClick={onClose} aria-label="Close" className="text-zinc-500 hover:text-white"><X size={20} /></button></div>
         <div className="mt-6 flex rounded-xl bg-black/20 p-1"><button type="button" onClick={() => onTypeChange("track")} className={`flex-1 rounded-lg py-2 text-sm ${type === "track" ? "bg-pink-400 text-[#191714]" : "text-zinc-500"}`}>Single track</button><button type="button" onClick={() => onTypeChange("album")} className={`flex-1 rounded-lg py-2 text-sm ${type === "album" ? "bg-pink-400 text-[#191714]" : "text-zinc-500"}`}>Album</button></div>
         <label className="mt-5 block text-xs text-zinc-400">{type === "album" ? "Album title" : "Track title"}</label>
