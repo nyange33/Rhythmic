@@ -1,8 +1,8 @@
 import type { FormEvent } from "react";
 import { Disc3, FileAudio, X } from "lucide-react";
-import { createPlaylist } from "@/api/playlists";
-import { createAlbum } from "@/api/albums";
-import { createTrack } from "@/api/tracks";
+import { createPlaylist } from "../api/playlists";
+import { createAlbum } from "../api/albums";
+import { createTrack } from "../api/tracks";
 
 export type PlaylistType = "Playlist" | "Album";
 export type UploadType = "track" | "album";
