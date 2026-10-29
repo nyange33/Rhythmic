@@ -11,4 +11,9 @@ type TrackRepository interface {
 	Delete(id string) error
 	Search(query string) ([]models.Track, error)
 	GetByIDs(ids []string) ([]models.Track, error)
+	GetByGenre(genre string) ([]models.Track, error)
+	GetPopular(limit int) ([]models.Track, error)
+	IncrementListenCount(id string) error
+	IncrementLikesCount(id string) error
+	DecrementLikesCount(id string) error
 }

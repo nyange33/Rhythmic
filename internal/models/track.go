@@ -8,9 +8,12 @@ type Track struct {
 	Title       string    `json:"title" bson:"title"`
 	Artist      string    `json:"artist" bson:"artist"`
 	Album       string    `json:"album" bson:"album"`
+	Genre       string    `json:"genre" bson:"genre"`
 	Duration    int       `json:"duration" bson:"duration"` // в секундах
 	AudioURL    string    `json:"audio_url" bson:"audio_url"`
 	ArtistID    string    `json:"artist_id" bson:"artist_id"`
+	ListenCount int       `json:"listen_count" bson:"listen_count"`
+	LikesCount  int       `json:"likes_count" bson:"likes_count"`
 	CreatedAt   time.Time `json:"created_at" bson:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at" bson:"updated_at"`
 }

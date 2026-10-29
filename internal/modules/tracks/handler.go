@@ -26,12 +26,15 @@ func RegisterRoutes(rg *gin.RouterGroup, svc *Service) {
 	g := rg.Group("/tracks")
 	g.GET("", func(c *gin.Context) { handleGetAllTracks(c, svc) })
 	g.GET("/search", func(c *gin.Context) { handleSearchTracks(c, svc) })
+	g.GET("/genre/:genre", func(c *gin.Context) { handleGetTracksByGenre(c, svc) })
+	g.GET("/popular", func(c *gin.Context) { handleGetPopularTracks(c, svc) })
 	g.GET("/artist/:artist_id", func(c *gin.Context) { handleGetTracksByArtist(c, svc) })
 	g.GET("/:id", func(c *gin.Context) { handleGetTrack(c, svc) })
 	g.POST("", func(c *gin.Context) { handleCreateTrack(c, svc) })
 	g.POST("/upload", func(c *gin.Context) { handleUploadAudio(c, svc) })
 	g.PUT("/:id", func(c *gin.Context) { handleUpdateTrack(c, svc) })
 	g.DELETE("/:id", func(c *gin.Context) { handleDeleteTrack(c, svc) })
+	g.POST("/:id/listen", func(c *gin.Context) { handleIncrementListenCount(c, svc) })
 }
 
 func handleGetAllTracks(c *gin.Context, svc *Service) {
@@ -166,6 +169,46 @@ func handleGetTracksByArtist(c *gin.Context, svc *Service) {
 	c.JSON(http.StatusOK, tracks)
 }
 
+func handleGetTracksByGenre(c *gin.Context, svc *Service) {
+	tracks, err := svc.GetByGenre(c.Param("genre"))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get tracks"})
+		return
+	}
+	c.JSON(http.StatusOK, tracks)
+}
+
+func handleGetPopularTracks(c *gin.Context, svc *Service) {
+	limit := 10
+	if limitStr := c.Query("limit"); limitStr != "" {
+		if l, err := fmt.Sscanf(limitStr, "%d", &limit); err == nil && l == 1 {
+			if limit > 50 {
+				limit = 50
+			}
+		}
+	}
+
+	tracks, err := svc.GetPopular(limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get popular tracks"})
+		return
+	}
+	c.JSON(http.StatusOK, tracks)
+}
+
+func handleIncrementListenCount(c *gin.Context, svc *Service) {
+	err := svc.IncrementListenCount(c.Param("id"))
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "track not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to increment listen count"})
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
 func (s *Service) GetAll() ([]TrackView, error) {
 	tracks, err := s.tracks.GetAll()
 	if err != nil {
@@ -203,6 +246,7 @@ func (s *Service) Create(req CreateTrackRequest) (TrackView, error) {
 		Title:    req.Title,
 		Artist:   req.Artist,
 		Album:    req.Album,
+		Genre:    req.Genre,
 		Duration: req.Duration,
 		AudioURL: req.AudioURL,
 		ArtistID: req.ArtistID,
@@ -228,6 +272,9 @@ func (s *Service) Update(id string, req UpdateTrackRequest) (TrackView, error) {
 	}
 	if req.Album != "" {
 		updated.Album = req.Album
+	}
+	if req.Genre != "" {
+		updated.Genre = req.Genre
 	}
 	if req.Duration > 0 {
 		updated.Duration = req.Duration
@@ -262,16 +309,47 @@ func (s *Service) GetByArtistID(artistID string) ([]TrackView, error) {
 	return views, nil
 }
 
+func (s *Service) GetByGenre(genre string) ([]TrackView, error) {
+	tracks, err := s.tracks.GetByGenre(genre)
+	if err != nil {
+		return nil, err
+	}
+	views := make([]TrackView, len(tracks))
+	for i, track := range tracks {
+		views[i] = toView(track)
+	}
+	return views, nil
+}
+
+func (s *Service) GetPopular(limit int) ([]TrackView, error) {
+	tracks, err := s.tracks.GetPopular(limit)
+	if err != nil {
+		return nil, err
+	}
+	views := make([]TrackView, len(tracks))
+	for i, track := range tracks {
+		views[i] = toView(track)
+	}
+	return views, nil
+}
+
+func (s *Service) IncrementListenCount(id string) error {
+	return s.tracks.IncrementListenCount(id)
+}
+
 func toView(track models.Track) TrackView {
 	return TrackView{
-		ID:        track.ID,
-		Title:     track.Title,
-		Artist:    track.Artist,
-		Album:     track.Album,
-		Duration:  track.Duration,
-		AudioURL:  track.AudioURL,
-		ArtistID:  track.ArtistID,
-		CreatedAt: track.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		ID:          track.ID,
+		Title:       track.Title,
+		Artist:      track.Artist,
+		Album:       track.Album,
+		Genre:       track.Genre,
+		Duration:    track.Duration,
+		AudioURL:    track.AudioURL,
+		ArtistID:    track.ArtistID,
+		ListenCount: track.ListenCount,
+		LikesCount:  track.LikesCount,
+		CreatedAt:   track.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 	}
 }
 
