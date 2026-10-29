@@ -9,6 +9,7 @@ import (
 	"Rhythmic/internal/modules/auth"
 	followsModule "Rhythmic/internal/modules/follows"
 	"Rhythmic/internal/modules/health"
+	likesModule "Rhythmic/internal/modules/likes"
 	playlistsModule "Rhythmic/internal/modules/playlists"
 	"Rhythmic/internal/modules/recommendations"
 	tracksModule "Rhythmic/internal/modules/tracks"
@@ -26,6 +27,7 @@ func main() {
 	albumStore := memory.NewAlbumStore()
 	artistStore := memory.NewArtistStore()
 	followStore := memory.NewFollowStore()
+	likeStore := memory.NewLikeStore()
 
 	// Initialize services
 	authSvc := auth.NewService(users, sessions)
@@ -33,6 +35,7 @@ func main() {
 	playlistsSvc := playlistsModule.NewService(playlistStore)
 	albumsSvc := albumsModule.NewService(albumStore)
 	followsSvc := followsModule.NewService(followStore, artistStore)
+	likesSvc := likesModule.NewService(likeStore, trackStore)
 	recommendationsSvc := recommendations.NewService(trackStore, followStore)
 	healthSvc := health.NewService()
 
@@ -52,6 +55,7 @@ func main() {
 	playlistsModule.RegisterRoutes(api, playlistsSvc)
 	albumsModule.RegisterRoutes(api, albumsSvc)
 	followsModule.RegisterRoutes(api, followsSvc)
+	likesSvc.RegisterRoutes(api)
 	recommendations.RegisterRoutes(api, recommendationsSvc)
 
 	// Server configuration

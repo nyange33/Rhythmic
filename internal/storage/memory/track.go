@@ -144,6 +144,91 @@ func (s *TrackStore) GetByIDs(ids []string) ([]models.Track, error) {
 	return tracks, nil
 }
 
+func (s *TrackStore) GetByGenre(genre string) ([]models.Track, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var tracks []models.Track
+	for _, track := range s.byID {
+		if track.Genre == genre {
+			tracks = append(tracks, track)
+		}
+	}
+	return tracks, nil
+}
+
+func (s *TrackStore) GetPopular(limit int) ([]models.Track, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	tracks := make([]models.Track, 0, len(s.byID))
+	for _, track := range s.byID {
+		tracks = append(tracks, track)
+	}
+
+	// Sort by listen count (simple bubble sort for memory storage)
+	for i := 0; i < len(tracks)-1; i++ {
+		for j := 0; j < len(tracks)-i-1; j++ {
+			if tracks[j].ListenCount < tracks[j+1].ListenCount {
+				tracks[j], tracks[j+1] = tracks[j+1], tracks[j]
+			}
+		}
+	}
+
+	if limit > 0 && limit < len(tracks) {
+		tracks = tracks[:limit]
+	}
+
+	return tracks, nil
+}
+
+func (s *TrackStore) IncrementListenCount(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	track, ok := s.byID[id]
+	if !ok {
+		return storage.ErrNotFound
+	}
+
+	track.ListenCount++
+	track.UpdatedAt = time.Now().UTC()
+	s.byID[id] = track
+	return nil
+}
+
+func (s *TrackStore) IncrementLikesCount(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	track, ok := s.byID[id]
+	if !ok {
+		return storage.ErrNotFound
+	}
+
+	track.LikesCount++
+	track.UpdatedAt = time.Now().UTC()
+	s.byID[id] = track
+	return nil
+}
+
+func (s *TrackStore) DecrementLikesCount(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	track, ok := s.byID[id]
+	if !ok {
+		return storage.ErrNotFound
+	}
+
+	if track.LikesCount > 0 {
+		track.LikesCount--
+	}
+	track.UpdatedAt = time.Now().UTC()
+	s.byID[id] = track
+	return nil
+}
+
 func (s *TrackStore) Delete(id string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
