@@ -138,12 +138,14 @@ export function TrackRow({
   liked,
   onPlay,
   onLike,
+  onOpenArtist,
 }: {
   track: Track;
   active: boolean;
   liked: boolean;
   onPlay: () => void;
   onLike: () => void;
+  onOpenArtist?: (artistName: string) => void;
 }) {
   return (
     <div
@@ -181,7 +183,7 @@ export function TrackRow({
           )}
         </div>
 
-        <p className="mt-1 truncate text-xs text-zinc-500">{track.artist}</p>
+        {onOpenArtist ? <button type="button" onClick={() => onOpenArtist(track.artist)} className="mt-1 block max-w-full truncate text-left text-xs text-zinc-500 transition hover:text-pink-300 hover:underline focus-visible:outline-none focus-visible:text-pink-300" aria-label={`Open artist ${track.artist}`}>{track.artist}</button> : <p className="mt-1 truncate text-xs text-zinc-500">{track.artist}</p>}
       </div>
 
       <Waveform active={active} compact />

@@ -10,9 +10,9 @@ import (
 )
 
 type TrackStore struct {
-	mu        sync.RWMutex
-	byID      map[string]models.Track
-	byArtist  map[string][]string // artistID -> track IDs
+	mu       sync.RWMutex
+	byID     map[string]models.Track
+	byArtist map[string][]string // artistID -> track IDs
 }
 
 func NewTrackStore() *TrackStore {
@@ -110,20 +110,20 @@ func (s *TrackStore) Update(id string, updated models.Track) (models.Track, erro
 }
 
 func (s *TrackStore) Search(query string) ([]models.Track, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	if query == "" {
+	if strings.TrimSpace(query) == "" {
 		return s.GetAll()
 	}
 
-	query = strings.ToLower(query)
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	query = strings.ToLower(strings.TrimSpace(query))
 	results := []models.Track{}
 
 	for _, track := range s.byID {
 		if strings.Contains(strings.ToLower(track.Title), query) ||
 			strings.Contains(strings.ToLower(track.Artist), query) ||
-			strings.Contains(strings.ToLower(track.Album), query) {
+			strings.Contains(strings.ToLower(track.Album), query) ||
+			strings.Contains(strings.ToLower(track.Genre), query) {
 			results = append(results, track)
 		}
 	}

@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { ArrowRight, Music2, X } from "lucide-react";
-import { login, register } from "../../api/auth";
+import { login as loginRequest, register, type AuthResponse } from "../../api/auth";
 
 export type AuthMode = "signIn" | "signUp";
 
@@ -10,14 +10,16 @@ type AuthDialogProps = {
   theme: "light" | "dark";
   onModeChange: (mode: AuthMode) => void;
   onClose: () => void;
+  onAuthenticated: (response: AuthResponse) => void;
 };
 
-export default function AuthDialog({ open, mode, theme, onModeChange, onClose }: AuthDialogProps) {
+export default function AuthDialog({ open, mode, theme, onModeChange, onClose, onAuthenticated }: AuthDialogProps) {
   const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
   const [email, setEmail] = useState("");
   const [isArtist, setIsArtist] = useState(false);
   const [message, setMessage] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   if (!open) return null;
 
@@ -25,26 +27,21 @@ export default function AuthDialog({ open, mode, theme, onModeChange, onClose }:
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-
+    setSubmitting(true);
+    setMessage("");
     try {
-      if (isSignUp) {
-        await register({
-          username: login,
-          email,
-          password,
-          role: isArtist ? "artist" : "listener",
-        });
-        setMessage("Регистрация успешна! Теперь войдите в аккаунт.");
-        switchMode("signIn");
-      } else {
-        const response = await login({ email, password });
-        setMessage(`Успешный вход! Токен: ${response.token.substring(0, 20)}...`);
-        // Здесь можно сохранить токен в localStorage или state
-        localStorage.setItem("token", response.token);
-        localStorage.setItem("user", JSON.stringify(response.user));
-      }
+      const response = isSignUp
+        ? await register({ username: login.trim(), email: email.trim(), password, role: isArtist ? "artist" : "listener" })
+        : await loginRequest({ identifier: login.trim(), password });
+      localStorage.setItem("token", response.token);
+      localStorage.setItem("user", JSON.stringify(response.user));
+      setMessage(isSignUp ? "Аккаунт создан. Добро пожаловать в Rhythmic!" : "Вход выполнен. Добро пожаловать!");
+      onAuthenticated(response);
+      onClose();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Произошла ошибка");
+      setMessage(error instanceof Error ? error.message : "Не удалось выполнить запрос. Проверь, запущен ли backend.");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -78,8 +75,8 @@ export default function AuthDialog({ open, mode, theme, onModeChange, onClose }:
 
             <form onSubmit={submit} className="mt-7 space-y-4">
               <label className="auth-label block text-xs font-medium">
-                Login
-                <input required autoComplete="username" value={login} onChange={(event) => setLogin(event.target.value)} placeholder="Your login" className="auth-input mt-2 w-full rounded-xl px-4 py-3 text-sm outline-none" />
+                Login or email
+                <input required autoComplete="username" value={login} onChange={(event) => setLogin(event.target.value)} placeholder={isSignUp ? "Your login" : "Your login or email"} className="auth-input mt-2 w-full rounded-xl px-4 py-3 text-sm outline-none" />
               </label>
 
               {isSignUp && (
@@ -91,7 +88,7 @@ export default function AuthDialog({ open, mode, theme, onModeChange, onClose }:
 
               <label className="auth-label block text-xs font-medium">
                 Password
-                <input required minLength={6} type="password" autoComplete={isSignUp ? "new-password" : "current-password"} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="At least 6 characters" className="auth-input mt-2 w-full rounded-xl px-4 py-3 text-sm outline-none" />
+                <input required minLength={8} type="password" autoComplete={isSignUp ? "new-password" : "current-password"} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="At least 8 characters" className="auth-input mt-2 w-full rounded-xl px-4 py-3 text-sm outline-none" />
               </label>
 
               {isSignUp && (
@@ -106,8 +103,8 @@ export default function AuthDialog({ open, mode, theme, onModeChange, onClose }:
 
               {message && <p role="status" className="auth-message rounded-xl px-3 py-3 text-xs leading-5">{message}</p>}
 
-              <button type="submit" className="auth-submit group flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3.5 text-sm font-semibold">
-                {isSignUp ? "Create account" : "Sign in"}
+              <button type="submit" disabled={submitting} className="auth-submit disabled:cursor-wait disabled:opacity-60 group flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3.5 text-sm font-semibold">
+                {submitting ? "Please wait…" : isSignUp ? "Create account" : "Sign in"}
                 <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />
               </button>
             </form>

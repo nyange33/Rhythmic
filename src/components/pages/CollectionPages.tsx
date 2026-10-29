@@ -21,6 +21,7 @@ type Props = {
   onPageChange: (page: Page) => void;
   onPlay: (id: number) => void;
   onLike: (id: number) => void;
+  onOpenArtist?: (artistName: string) => void;
   onCreateCollection: () => void;
   onDeleteCollection: (id: number) => void;
   onToggleCollectionTrack: (collectionId: number, trackId: number) => void;
@@ -36,6 +37,7 @@ export default function CollectionPages({
   onPageChange,
   onPlay,
   onLike,
+  onOpenArtist,
   onCreateCollection,
   onDeleteCollection,
   onToggleCollectionTrack,
@@ -64,7 +66,7 @@ export default function CollectionPages({
           <h2 className="mt-10 text-xl font-bold">Recently added</h2>
           <div className="mt-4 space-y-1">
             {tracks.map((track) => (
-              <TrackRow key={track.id} track={track} active={track.id === playingId} liked={likedIds.includes(track.id)} onPlay={() => onPlay(track.id)} onLike={() => onLike(track.id)} />
+              <TrackRow key={track.id} track={track} active={track.id === playingId} liked={likedIds.includes(track.id)} onPlay={() => onPlay(track.id)} onLike={() => onLike(track.id)} onOpenArtist={onOpenArtist} />
             ))}
           </div>
         </>
@@ -77,7 +79,7 @@ export default function CollectionPages({
           <p className="mt-2 text-sm text-zinc-500">Треки, которые ты отметил сердечком. Список сохраняется в этом браузере.</p>
           <div className="mt-8 space-y-1">
             {tracks.filter((track) => likedIds.includes(track.id)).map((track) => (
-              <TrackRow key={track.id} track={track} active={track.id === playingId} liked onPlay={() => onPlay(track.id)} onLike={() => onLike(track.id)} />
+              <TrackRow key={track.id} track={track} active={track.id === playingId} liked onPlay={() => onPlay(track.id)} onLike={() => onLike(track.id)} onOpenArtist={onOpenArtist} />
             ))}
           </div>
           {likedIds.length === 0 && (

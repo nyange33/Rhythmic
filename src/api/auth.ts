@@ -1,4 +1,4 @@
-import { request } from './client';
+import { request, requestWithAuth } from './client';
 
 export interface RegisterRequest {
   username: string;
@@ -8,7 +8,7 @@ export interface RegisterRequest {
 }
 
 export interface LoginRequest {
-  email: string;
+  identifier: string;
   password: string;
 }
 
@@ -17,6 +17,7 @@ export interface AuthResponse {
   user: {
     id: string;
     username: string;
+    bio?: string;
     email: string;
     role: string;
     created_at: string;
@@ -35,4 +36,15 @@ export async function login(data: LoginRequest): Promise<AuthResponse> {
     method: 'POST',
     body: JSON.stringify(data),
   });
+}
+
+export async function getCurrentUser(token: string): Promise<AuthResponse["user"]> {
+  return requestWithAuth<AuthResponse["user"]>("/auth/me", {}, token);
+}
+
+export async function updateProfile(data: { username: string; bio: string }, token: string): Promise<AuthResponse["user"]> {
+  return requestWithAuth<AuthResponse["user"]>("/users/me", {
+    method: "PUT",
+    body: JSON.stringify(data),
+  }, token);
 }

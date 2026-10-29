@@ -19,6 +19,7 @@ export function useAudioPlayer(tracks: Track[]) {
     if (!audioRef.current) {
       const audio = new Audio();
       audio.preload = "metadata";
+      audio.crossOrigin = "anonymous";
       audioRef.current = audio;
       engineRef.current = new AudioEngine();
       setEngine(engineRef.current);

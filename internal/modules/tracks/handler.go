@@ -5,9 +5,15 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
 
+	"Rhythmic/internal/middleware"
 	"Rhythmic/internal/models"
+	"Rhythmic/internal/modules/auth"
 	"Rhythmic/internal/storage"
 	"Rhythmic/internal/utils"
 
@@ -22,7 +28,7 @@ func NewService(tracks storage.TrackRepository) *Service {
 	return &Service{tracks: tracks}
 }
 
-func RegisterRoutes(rg *gin.RouterGroup, svc *Service) {
+func RegisterRoutes(rg *gin.RouterGroup, svc *Service, authSvc *auth.Service) {
 	g := rg.Group("/tracks")
 	g.GET("", func(c *gin.Context) { handleGetAllTracks(c, svc) })
 	g.GET("/search", func(c *gin.Context) { handleSearchTracks(c, svc) })
@@ -30,8 +36,11 @@ func RegisterRoutes(rg *gin.RouterGroup, svc *Service) {
 	g.GET("/popular", func(c *gin.Context) { handleGetPopularTracks(c, svc) })
 	g.GET("/artist/:artist_id", func(c *gin.Context) { handleGetTracksByArtist(c, svc) })
 	g.GET("/:id", func(c *gin.Context) { handleGetTrack(c, svc) })
-	g.POST("", func(c *gin.Context) { handleCreateTrack(c, svc) })
-	g.POST("/upload", func(c *gin.Context) { handleUploadAudio(c, svc) })
+	protected := rg.Group("/tracks")
+	protected.Use(auth.RequireAuth(authSvc), middleware.RequireArtistRole())
+	protected.POST("", func(c *gin.Context) { handleCreateTrack(c, svc) })
+	protected.POST("/upload", func(c *gin.Context) { handleUploadAudio(c, svc) })
+	protected.POST("/upload-cover", func(c *gin.Context) { handleUploadCover(c) })
 	g.PUT("/:id", func(c *gin.Context) { handleUpdateTrack(c, svc) })
 	g.DELETE("/:id", func(c *gin.Context) { handleDeleteTrack(c, svc) })
 	g.POST("/:id/listen", func(c *gin.Context) { handleIncrementListenCount(c, svc) })
@@ -75,6 +84,14 @@ func handleCreateTrack(c *gin.Context, svc *Service) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	userValue, exists := c.Get("user")
+	user, ok := userValue.(models.User)
+	if !exists || !ok || user.Role != models.RoleArtist {
+		c.JSON(http.StatusForbidden, gin.H{"error": "artist account required"})
+		return
+	}
+	req.ArtistID = user.ID
+	req.Artist = user.Username
 	track, err := svc.Create(req)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create track"})
@@ -96,7 +113,11 @@ func handleUploadAudio(c *gin.Context, svc *Service) {
 		return
 	}
 
-	// Open uploaded file
+	if file.Size > 100<<20 {
+		c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "audio file exceeds 100 MB"})
+		return
+	}
+
 	src, err := file.Open()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to open file"})
@@ -104,29 +125,92 @@ func handleUploadAudio(c *gin.Context, svc *Service) {
 	}
 	defer src.Close()
 
-	// Convert to MP3
-	converter := utils.NewAudioConverter()
-	inputData := make([]byte, file.Size)
-	if _, err := src.Read(inputData); err != nil {
+	inputData, err := io.ReadAll(src)
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read file"})
 		return
 	}
 
 	format := utils.GetAudioFormat(file.Filename)
-	_, err = converter.ConvertToMP3FromBytes(inputData, format)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to convert audio"})
+	converted := inputData
+	if format != "mp3" {
+		converted, err = utils.NewAudioConverter().ConvertToMP3FromBytes(inputData, format)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "audio conversion failed; install ffmpeg or upload an MP3 file"})
+			return
+		}
+	}
+
+	root := "."
+	if _, statErr := os.Stat(filepath.Join(root, "public")); os.IsNotExist(statErr) {
+		root = filepath.Join("..", "..")
+	}
+	fileName := randomHex(12) + ".mp3"
+	outputPath := filepath.Join(root, "public", "uploads", "tracks", fileName)
+	if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create upload directory"})
+		return
+	}
+	if err := os.WriteFile(outputPath, converted, 0644); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save audio file"})
 		return
 	}
 
-	// In production, save to cloud storage or local disk
-	// For now, return a mock URL
-	audioURL := fmt.Sprintf("/uploads/tracks/%s.mp3", randomHex(12))
+	scheme := "http"
+	if c.Request.TLS != nil {
+		scheme = "https"
+	}
+	audioURL := fmt.Sprintf("%s://%s/uploads/tracks/%s", scheme, c.Request.Host, fileName)
+	c.JSON(http.StatusOK, UploadAudioResponse{AudioURL: audioURL, Duration: 0})
+}
 
-	c.JSON(http.StatusOK, UploadAudioResponse{
-		AudioURL: audioURL,
-		Duration: 0, // Would need to extract actual duration
-	})
+func handleUploadCover(c *gin.Context) {
+	file, err := c.FormFile("cover")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "no cover image provided"})
+		return
+	}
+	if file.Size > 5<<20 {
+		c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "cover image exceeds 5 MB"})
+		return
+	}
+	extension := filepath.Ext(file.Filename)
+	switch strings.ToLower(extension) {
+	case ".jpg", ".jpeg", ".png", ".webp", ".gif":
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"error": "cover must be JPG, PNG, WEBP or GIF"})
+		return
+	}
+	src, err := file.Open()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to open cover"})
+		return
+	}
+	defer src.Close()
+	data, err := io.ReadAll(src)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read cover"})
+		return
+	}
+	root := "."
+	if _, statErr := os.Stat(filepath.Join(root, "public")); os.IsNotExist(statErr) {
+		root = filepath.Join("..", "..")
+	}
+	fileName := randomHex(12) + strings.ToLower(extension)
+	outputPath := filepath.Join(root, "public", "uploads", "covers", fileName)
+	if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create cover directory"})
+		return
+	}
+	if err := os.WriteFile(outputPath, data, 0644); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save cover"})
+		return
+	}
+	scheme := "http"
+	if c.Request.TLS != nil {
+		scheme = "https"
+	}
+	c.JSON(http.StatusOK, gin.H{"cover_url": fmt.Sprintf("%s://%s/uploads/covers/%s", scheme, c.Request.Host, fileName)})
 }
 
 func handleUpdateTrack(c *gin.Context, svc *Service) {
@@ -249,6 +333,7 @@ func (s *Service) Create(req CreateTrackRequest) (TrackView, error) {
 		Genre:    req.Genre,
 		Duration: req.Duration,
 		AudioURL: req.AudioURL,
+		CoverURL: req.CoverURL,
 		ArtistID: req.ArtistID,
 	})
 	if err != nil {
@@ -281,6 +366,9 @@ func (s *Service) Update(id string, req UpdateTrackRequest) (TrackView, error) {
 	}
 	if req.AudioURL != "" {
 		updated.AudioURL = req.AudioURL
+	}
+	if req.CoverURL != "" {
+		updated.CoverURL = req.CoverURL
 	}
 	if req.ArtistID != "" {
 		updated.ArtistID = req.ArtistID
@@ -346,6 +434,7 @@ func toView(track models.Track) TrackView {
 		Genre:       track.Genre,
 		Duration:    track.Duration,
 		AudioURL:    track.AudioURL,
+		CoverURL:    track.CoverURL,
 		ArtistID:    track.ArtistID,
 		ListenCount: track.ListenCount,
 		LikesCount:  track.LikesCount,

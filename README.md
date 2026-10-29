@@ -2,31 +2,60 @@
 
 # Rhythmic
 
-**Стриминговая платформа для музыки — для слушателей и артистов**
-
-[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](https://react.dev/)
-[![Vite](https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
-[![Tailwind](https://img.shields.io/badge/Tailwind-0F172A?style=for-the-badge&logo=tailwindcss&logoColor=38BDF8)](https://tailwindcss.com/)
-[![Go](https://img.shields.io/badge/Go-0B3D2E?style=for-the-badge&logo=go&logoColor=white)](https://go.dev/)
+**Музыкальная платформа для слушателей и артистов**
 
 </div>
 
+## Реализовано
 
+- Отдельная страница Explore с фильтрами по жанрам и сортировкой каталога.
+- Поиск по трекам, артистам и жанрам с выпадающими результатами в header.
+- Детальная страница плейлиста или альбома: обложка, метаданные, воспроизведение, удаление треков и добавление треков из боковой панели.
+- Добавление трека в плейлист из нижнего плеера.
+- Регистрация и вход через Go API, поддержка входа по логину или email, сохранение токена и проверка сессии при перезагрузке.
+- Доступ к приложению закрыт до входа в аккаунт. Загрузка музыки доступна только аккаунтам артиста.
+- Треки, избранное, плейлисты и альбомы связаны с существующими API-модулями.
+- Загрузка MP3 сохраняет аудио в `public/uploads/tracks`; другие форматы конвертируются в MP3 через FFmpeg.
+- При запуске backend отдаёт пять демонстрационных треков, соответствующих файлам из `public/music`.
 
-## Rhythmic UI updates
+## Запуск
 
-The interface uses a graphite base palette with gold accents. Added frontend pages for Library, Liked Tracks, Notifications, and Playlists / Albums. Collection data and liked track IDs are saved in the browser's localStorage. The upload dialog supports choosing one audio file for a single or multiple files for an album; publishing files to a shared server requires connecting an upload endpoint/backend. Notifications display playback errors and a placeholder for new releases from followed artists; artist subscriptions and server-pushed release notifications require backend support.
+Нужны Node.js/npm и версия Go, совместимая с `go.mod`.
 
-Start locally:
+В первом терминале из корня проекта:
+
+```bash
+go run ./cmd/api
+```
+
+Во втором терминале:
 
 ```bash
 npm install
 npm run dev
 ```
 
-### Source layout
+Frontend по умолчанию обращается к `http://localhost:8090/api`. Для другого адреса можно задать `VITE_API_BASE_URL`, например `VITE_API_BASE_URL=http://localhost:8090/api`. Для конвертации WAV/OGG/FLAC и других форматов нужен FFmpeg в PATH; MP3 сохраняется без конвертации.
 
-- `src/components/pages/CollectionPages.tsx` — Library, Liked Tracks, Notifications, and Playlists / Albums pages.
-- `src/components/dialogs/MusicDialogs.tsx` — create-collection and upload-music dialogs.
-- `src/components/MusicComponents.tsx` — shared cover, navigation, waveform, and track-row components.
+## Важно о хранении данных
+
+Текущий backend использует in-memory storage: пользователи, сессии, лайки, плейлисты и альбомы хранятся в памяти процесса и сбрасываются при перезапуске Go-сервера. Это подключение frontend к существующему API, а не постоянная база данных. Для сохранения данных между перезапусками потребуется подключить БД к репозиториям в `internal/storage`.
+
+## Структура новых компонентов
+
+- `src/components/pages/explorePage.tsx` — Explore, жанры, фильтрация и сортировка.
+- `src/components/headerSearch.tsx` — поиск с выпадающими результатами.
+- `src/components/pages/playlistDetailPage.tsx` — детальная страница плейлиста/альбома.
+- `src/utils/trackAdapter.ts` — преобразование API-моделей в модели UI.
+- `src/types/playlist.ts` — общий тип плейлиста/альбома.
+- `src/api/likes.ts` — API избранного.
+
+## Обновления интерфейса и публикации
+
+- Экран до авторизации вынесен в `src/components/pages/landingPage.tsx`; на нём нет основного header.
+- Поиск в header показывает найденные треки и артистов. Выбор артиста открывает его профиль с треками из каталога.
+- Профиль текущего пользователя отображает его имя из сессии; демонстрационный артист `королевски 17` доступен через поиск по его трекам.
+- В форме публикации нельзя вручную указать имя артиста: оно отображается из текущей сессии.
+- Go API требует действующую сессию и роль артиста для загрузки аудио и создания треков/альбомов; сервер сам задаёт владельца публикации по аккаунту из токена.
+- Диагностические ошибки для плейлистов и загрузки каталога выводятся в консоль. Видимые сообщения об ошибках оставлены только в окнах авторизации и загрузки музыки; поиск отдельно показывает состояние «ничего не найдено».
+- Хранилища остаются in-memory, PostgreSQL не подключался.

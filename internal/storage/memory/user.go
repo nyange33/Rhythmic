@@ -74,6 +74,40 @@ func (s *UserStore) GetByEmail(email string) (models.User, error) {
 	return s.byID[id], nil
 }
 
+func (s *UserStore) GetByUsername(username string) (models.User, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	id, ok := s.name[strings.ToLower(strings.TrimSpace(username))]
+	if !ok {
+		return models.User{}, storage.ErrNotFound
+	}
+	return s.byID[id], nil
+}
+
+func (s *UserStore) Update(user models.User) (models.User, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	existing, ok := s.byID[user.ID]
+	if !ok {
+		return models.User{}, storage.ErrNotFound
+	}
+	newName := strings.ToLower(strings.TrimSpace(user.Username))
+	if ownerID, taken := s.name[newName]; taken && ownerID != user.ID {
+		return models.User{}, storage.ErrUsernameTaken
+	}
+	delete(s.name, strings.ToLower(existing.Username))
+	user.Username = strings.TrimSpace(user.Username)
+	user.Email = existing.Email
+	user.PasswordHash = existing.PasswordHash
+	user.Role = existing.Role
+	user.CreatedAt = existing.CreatedAt
+	user.UpdatedAt = time.Now().UTC()
+	s.byID[user.ID] = user
+	s.name[newName] = user.ID
+	return user, nil
+}
+
 func (s *UserStore) Delete(id string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

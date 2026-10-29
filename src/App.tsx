@@ -1,5 +1,5 @@
 import ProfilePage from "./profilePage";
-import { tracks } from "./data/tracks";
+import { tracks as fallbackTracks } from "./data/tracks";
 import { useAudioPlayer } from "./hooks/useAudioPlayer";
 import { useEqualizer } from "./hooks/useEqualizer";
 import { EQ_FREQUENCIES } from "./audio/audioEngine";
@@ -9,6 +9,18 @@ import { Cover, NavItem, TrackRow } from "./components/musicComponents";
 import MusicPages from "./components/pages/musicPages";
 import { PlaylistDialog, UploadMusicDialog, type PlaylistType, type UploadType } from "./components/dialogs/musicDialogs";
 import AuthDialog, { type AuthMode } from "./components/dialogs/authDialog";
+import ExplorePage from "./components/pages/explorePage";
+import ArtistPage from "./components/pages/artistPage";
+import AlbumDetailPage from "./components/pages/albumDetailPage";
+import HeaderSearch from "./components/headerSearch";
+import LandingPage from "./components/pages/landingPage";
+import { getAllTracks, createTrack as createApiTrack, uploadAudio, uploadCover } from "./api/tracks";
+import { getUserPlaylists, createPlaylist as createApiPlaylist, deletePlaylist as deleteApiPlaylist, addTrackToPlaylist, removeTrackFromPlaylist } from "./api/playlists";
+import { getAllAlbums, createAlbum, addTrackToAlbum, type Album } from "./api/albums";
+import { getUserLikes, createLike, deleteLike } from "./api/likes";
+import { getCurrentUser, updateProfile, type AuthResponse } from "./api/auth";
+import type { PlaylistItem } from "./types/playlist";
+import { mapApiAlbum, mapApiPlaylist, mapApiTrack } from "./utils/trackAdapter";
 
 import {
   Bell,
@@ -36,7 +48,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 
 const genres = [
   {
@@ -66,26 +78,19 @@ const eqBands = EQ_FREQUENCIES.map((frequency) => ({
   label: frequency >= 1000 ? `${frequency / 1000} kHz` : `${frequency} Hz`,
 }));
 
-function ArtistAvatar({ size = "large" }: { size?: "small" | "large" }) {
-  const [imageIndex, setImageIndex] = useState(0);
-  const candidates = [
-    "/avatar/avatar.png",
-    "/avatar/avatar.jpg",
-    "/avatar/avatar.jpeg",
-    "/avatar/avatar.webp",
-    "/avatar/avatar.gif",
-  ];
-  const src = candidates[imageIndex];
+function ArtistAvatar({ size = "large", avatarUrl, showArtistDefault = false }: { size?: "small" | "large"; avatarUrl?: string | null; showArtistDefault?: boolean }) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const src = avatarUrl || (showArtistDefault ? "/avatar/avatar.jpg" : null);
   const dimensions = size === "large" ? "h-32 w-32 sm:h-40 sm:w-40" : "h-11 w-11";
 
   return (
     <div className={`relative flex ${dimensions} shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-pink-400 via-stone-500 to-pink-700`}>
-      {src ? (
+      {src && !imageFailed ? (
         <img
           src={src}
-          alt="королевски 17 avatar"
+          alt="Profile avatar"
           className="h-full w-full object-cover"
-          onError={() => setImageIndex((index) => index + 1)}
+          onError={() => setImageFailed(true)}
         />
       ) : (
         <div className="flex items-end gap-[2px]">
@@ -190,8 +195,27 @@ function parseDuration(value: string) {
   return minutes * 60 + seconds;
 }
 
+function profileNameKey(userId: string) { return `rhythmic-profile-name:${userId}`; }
+function profileBioKey(userId: string) { return `rhythmic-profile-bio:${userId}`; }
+function savedAlbumsKey(userId: string) { return `rhythmic-saved-albums:${userId}`; }
+function withSavedProfile<T extends { id: string; username: string }>(user: T): T {
+  const savedName = localStorage.getItem(profileNameKey(user.id));
+  return savedName ? { ...user, username: savedName } : user;
+}
+
 export default function App() {
-  const [page, setPage] = useState<"home" | "profile" | "library" | "liked" | "notifications" | "playlists">("home");
+  const [page, setPage] = useState<"home" | "explore" | "profile" | "artist" | "album" | "library" | "liked" | "notifications" | "playlists">("home");
+  const [tracks, setTracks] = useState(fallbackTracks);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedPlaylistId, setSelectedPlaylistId] = useState<number | null>(null);
+  const [selectedProfileName, setSelectedProfileName] = useState("");
+  const [selectedAlbumId, setSelectedAlbumId] = useState<string | null>(null);
+  const [albumReturnPage, setAlbumReturnPage] = useState<"profile" | "artist" | "library" | "playlists" | "explore" | "home">("profile");
+  const [allAlbums, setAllAlbums] = useState<Album[]>([]);
+  const [savedAlbumIds, setSavedAlbumIds] = useState<string[]>([]);
+  const [profileBio, setProfileBio] = useState("");
+  const [sessionUser, setSessionUser] = useState<AuthResponse["user"] | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [theme, setTheme] = useState<"light" | "dark">(() => localStorage.getItem("rhythmic-theme") === "dark" ? "dark" : "light");
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<AuthMode>("signIn");
@@ -201,18 +225,120 @@ export default function App() {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [uploadType, setUploadType] = useState<UploadType>("track");
   const [uploadTitle, setUploadTitle] = useState("");
-  const [uploadArtist, setUploadArtist] = useState("королевски 17");
   const [uploadFiles, setUploadFiles] = useState<File[]>([]);
+  const [uploadCoverFile, setUploadCoverFile] = useState<File | null>(null);
+  const [uploadGenre, setUploadGenre] = useState("Electronic");
   const [uploadMessage, setUploadMessage] = useState("");
   const [playlistName, setPlaylistName] = useState("");
   const [playlistType, setPlaylistType] = useState<PlaylistType>("Playlist");
   const [playlistDialog, setPlaylistDialog] = useState(false);
-  const [playlists, setPlaylists] = useState<{id:number;name:string;type:"Playlist"|"Album";trackIds:number[]}[]>(() => {
-    try { return JSON.parse(localStorage.getItem("rhythmic-playlists") || '[{"id":1,"name":"Night drive","type":"Playlist","trackIds":[1,2]},{"id":2,"name":"Favorites","type":"Playlist","trackIds":[3,4]}]'); } catch { return []; }
-  });
+  const [playlists, setPlaylists] = useState<PlaylistItem[]>([]);
   const [eqOpen, setEqOpen] = useState(false);
   const [playlistOpen, setPlaylistOpen] = useState(false);
   const [mobileMenu, setMobileMenu] = useState(false);
+  useEffect(() => {
+    if (!sessionUser) {
+      setAvatarUrl(null);
+      return;
+    }
+    const avatarKey = `rhythmic-avatar:${sessionUser.role}:${sessionUser.id}`;
+    setAvatarUrl(localStorage.getItem(avatarKey));
+  }, [sessionUser?.id, sessionUser?.role]);
+
+  const handleAvatarChange = (nextAvatar: string) => {
+    if (!sessionUser) return;
+    const avatarKey = `rhythmic-avatar:${sessionUser.role}:${sessionUser.id}`;
+    localStorage.setItem(avatarKey, nextAvatar);
+    setAvatarUrl(nextAvatar);
+  };
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      localStorage.removeItem("user");
+      return;
+    }
+    let active = true;
+    getCurrentUser(token).then((user) => {
+      if (!active) return;
+      localStorage.setItem("user", JSON.stringify(user));
+      setSessionUser(withSavedProfile(user));
+    }).catch((error) => {
+      if (!active) return;
+      console.error("Session validation failed:", error);
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      setSessionUser(null);
+    });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    getAllAlbums().then((albums) => {
+      if (!active) return;
+      setAllAlbums(albums.map((album) => sessionUser && album.artist_id === sessionUser.id ? { ...album, artist_name: sessionUser.username } : album));
+    }).catch((error) => {
+      if (active) console.error("Failed to load albums:", error);
+    });
+    return () => { active = false; };
+  }, [sessionUser?.id, sessionUser?.username]);
+
+  useEffect(() => {
+    if (!sessionUser) {
+      setProfileBio("");
+      setSavedAlbumIds([]);
+      return;
+    }
+    const storedBio = localStorage.getItem(profileBioKey(sessionUser.id));
+    setProfileBio(storedBio !== null ? storedBio : sessionUser.bio || "");
+    try {
+      setSavedAlbumIds(JSON.parse(localStorage.getItem(savedAlbumsKey(sessionUser.id)) || "[]"));
+    } catch {
+      setSavedAlbumIds([]);
+    }
+  }, [sessionUser?.id]);
+
+  useEffect(() => {
+    let active = true;
+    getAllTracks().then((apiTracks) => {
+      if (!active) return;
+      if (apiTracks.length) {
+        const mapped = apiTracks.map((track, index) => {
+          const mappedTrack = mapApiTrack(track, index, fallbackTracks);
+          return sessionUser && track.artist_id === sessionUser.id ? { ...mappedTrack, artist: sessionUser.username } : mappedTrack;
+        }).sort((a, b) => a.id - b.id);
+        setTracks(mapped);
+      }
+    }).catch((error) => {
+      if (active) console.error("Failed to load tracks:", error);
+    });
+    return () => { active = false; };
+  }, [sessionUser?.id, sessionUser?.username]);
+
+  useEffect(() => {
+    if (!sessionUser) return;
+    let active = true;
+    const token = localStorage.getItem("token") || undefined;
+    Promise.all([getUserLikes(sessionUser.id), getUserPlaylists(sessionUser.id), getAllAlbums()]).then(([likes, apiPlaylists, albums]) => {
+      if (!active) return;
+      const likedTrackIds = likes.map((like) => tracks.find((track) => track.backendId === like.track_id)?.id).filter((id): id is number => id !== undefined);
+      setLikedIds(likedTrackIds);
+      const mappedPlaylists = apiPlaylists.map((item, index) => mapApiPlaylist(item, index, tracks));
+      let savedIds: string[] = [];
+      try { savedIds = JSON.parse(localStorage.getItem(savedAlbumsKey(sessionUser.id)) || "[]"); } catch { savedIds = []; }
+      setSavedAlbumIds(savedIds);
+      const accountAlbums = albums.filter((item) => item.artist_id === sessionUser.id || savedIds.includes(item.id));
+      const mappedAlbums = accountAlbums.map((item, index) => mapApiAlbum(item, index, tracks));
+      const uniqueCollections = [...mappedPlaylists, ...mappedAlbums].filter((item, index, all) => !item.backendId || all.findIndex((candidate) => candidate.backendId === item.backendId && candidate.type === item.type) === index);
+      setPlaylists(uniqueCollections);
+      localStorage.setItem(`rhythmic-playlists:${sessionUser.id}`, JSON.stringify(uniqueCollections));
+    }).catch((error) => {
+      if (active && token) console.error("Failed to load account library:", error);
+    });
+    return () => { active = false; };
+  }, [sessionUser?.id, tracks]);
+
   const {
     engine,
     playingId,
@@ -220,7 +346,6 @@ export default function App() {
     currentTime,
     duration,
     volume,
-    error: audioError,
     isPlaying,
     playTrack,
     togglePlay,
@@ -235,36 +360,262 @@ export default function App() {
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   const toggleLikeTrack = (id: number) => {
+    const track = tracks.find((item) => item.id === id);
+    const wasLiked = likedIds.includes(id);
     setLikedIds((current) => {
-      const next = current.includes(id) ? current.filter((item) => item !== id) : [...current, id];
+      const next = wasLiked ? current.filter((item) => item !== id) : [...current, id];
       localStorage.setItem("rhythmic-liked", JSON.stringify(next));
       return next;
     });
+    if (sessionUser && track?.backendId) {
+      const action = wasLiked ? deleteLike(sessionUser.id, track.backendId) : createLike(sessionUser.id, track.backendId);
+      void action.catch((error) => console.error("Failed to update liked tracks:", error));
+    }
   };
 
-  const savePlaylists = (next: typeof playlists) => {
+  const savePlaylists = (next: PlaylistItem[]) => {
     setPlaylists(next);
     localStorage.setItem("rhythmic-playlists", JSON.stringify(next));
   };
 
   const openPage = (next: typeof page) => {
     setPage(next);
+    if (next !== "playlists") setSelectedPlaylistId(null);
+    if (next !== "album") setSelectedAlbumId(null);
     setMobileMenu(false);
   };
 
-  const handleUpload = (event: FormEvent<HTMLFormElement>) => {
+  const openArtistPage = (artistName: string) => {
+    setSelectedProfileName(artistName);
+    setSearchQuery("");
+    openPage("artist");
+  };
+
+  const openAlbumPage = (id: string) => {
+    setAlbumReturnPage(page);
+    setSelectedAlbumId(id);
+    setPage("album");
+  };
+
+  const handleCreatePlaylist = async () => {
+    if (!sessionUser || !playlistName.trim()) return;
+    const token = localStorage.getItem("token") || undefined;
+    try {
+      if (playlistType === "Playlist") {
+        const created = await createApiPlaylist({ name: playlistName.trim(), description: "A collection made on Rhythmic", is_public: true }, sessionUser.id, token);
+        savePlaylists([...playlists, mapApiPlaylist(created, playlists.length, tracks)]);
+      } else {
+        if (sessionUser.role !== "artist") {
+          console.warn("An artist account is required to create an album.");
+          return;
+        }
+        const created = await createAlbum({ title: playlistName.trim(), artist_id: sessionUser.id, artist_name: sessionUser.username, release_date: new Date().toISOString() }, token);
+        setAllAlbums((current) => [...current.filter((album) => album.id !== created.id), created]);
+        savePlaylists([...playlists, mapApiAlbum(created, playlists.length, tracks)]);
+      }
+      setPlaylistName("");
+        setPlaylistDialog(false);
+    } catch (error) {
+      console.error("Failed to create playlist or album:", error);
+    }
+  };
+
+  const handleDeletePlaylist = async (id: number) => {
+    const item = playlists.find((playlist) => playlist.id === id);
+    if (!item || item.type === "Album") return;
+    try {
+      const token = localStorage.getItem("token") || undefined;
+      if (item.backendId) await deleteApiPlaylist(item.backendId, token);
+      savePlaylists(playlists.filter((playlist) => playlist.id !== id));
+      if (selectedPlaylistId === id) setSelectedPlaylistId(null);
+    } catch (error) {
+      console.error("Failed to delete playlist or album:", error);
+    }
+  };
+
+  const handleTogglePlaylistTrack = async (playlistId: number, trackId: number) => {
+    const playlist = playlists.find((item) => item.id === playlistId);
+    const track = tracks.find((item) => item.id === trackId);
+    if (!playlist || !track) return;
+    const hasTrack = playlist.trackIds.includes(trackId);
+    if (playlist.type === "Album" && (hasTrack || sessionUser?.role !== "artist" || !playlist.backendId || !allAlbums.some((album) => album.id === playlist.backendId && album.artist_id === sessionUser.id))) return;
+    try {
+      if (playlist.backendId && track.backendId) {
+        const token = localStorage.getItem("token") || undefined;
+        if (playlist.type === "Playlist") {
+          if (hasTrack) await removeTrackFromPlaylist(playlist.backendId, track.backendId, token);
+          else await addTrackToPlaylist(playlist.backendId, track.backendId, token);
+        } else {
+          await addTrackToAlbum(playlist.backendId, track.backendId, token);
+          setAllAlbums((current) => current.map((album) => album.id === playlist.backendId ? { ...album, track_ids: [...(album.track_ids || []), track.backendId!] } : album));
+        }
+      }
+      savePlaylists(playlists.map((item) => item.id === playlistId ? { ...item, trackIds: hasTrack ? item.trackIds.filter((id) => id !== trackId) : [...item.trackIds, trackId] } : item));
+    } catch (error) {
+      console.error("Failed to update playlist tracks:", error);
+    }
+  };
+
+  const handleToggleAlbumLibrary = (albumId: string) => {
+    if (!sessionUser) return;
+    const album = allAlbums.find((item) => item.id === albumId);
+    if (!album || album.artist_id === sessionUser.id) return;
+    const isSaved = savedAlbumIds.includes(albumId);
+    const nextIds = isSaved ? savedAlbumIds.filter((id) => id !== albumId) : [...savedAlbumIds, albumId];
+    setSavedAlbumIds(nextIds);
+    localStorage.setItem(savedAlbumsKey(sessionUser.id), JSON.stringify(nextIds));
+    const collectionExists = playlists.some((item) => item.type === "Album" && item.backendId === albumId);
+    if (!isSaved && !collectionExists) {
+      savePlaylists([...playlists, mapApiAlbum(album, playlists.length, tracks)]);
+    } else if (isSaved) {
+      savePlaylists(playlists.filter((item) => !(item.type === "Album" && item.backendId === albumId)));
+    }
+  };
+
+  const handleSaveProfile = async (nextName: string, nextBio: string) => {
+    if (!sessionUser) return;
+    const normalizedName = nextName.trim();
+    const token = localStorage.getItem("token");
+    if (!normalizedName || !token) return;
+    try {
+      const savedUser = await updateProfile({ username: normalizedName, bio: nextBio }, token);
+      const updatedUser = { ...sessionUser, ...savedUser };
+      localStorage.setItem(profileNameKey(sessionUser.id), normalizedName);
+      localStorage.setItem(profileBioKey(sessionUser.id), nextBio);
+      localStorage.setItem("user", JSON.stringify(updatedUser));
+      setSessionUser(updatedUser);
+      setSelectedProfileName(normalizedName);
+      setProfileBio(nextBio);
+      setTracks((current) => current.map((track) => track.artistId === sessionUser.id || track.artist.toLowerCase() === sessionUser.username.toLowerCase() ? { ...track, artist: normalizedName } : track));
+      setAllAlbums((current) => current.map((album) => album.artist_id === sessionUser.id ? { ...album, artist_name: normalizedName } : album));
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "Не удалось сохранить профиль.");
+    }
+  };
+
+  const handleAddTrackToAlbum = async (albumId: string, trackId: number) => {
+    if (!sessionUser || sessionUser.role !== "artist") return;
+    const album = allAlbums.find((item) => item.id === albumId);
+    const track = tracks.find((item) => item.id === trackId);
+    if (!album || album.artist_id !== sessionUser.id || !track?.backendId) return;
+    const currentTrackIds = album.track_ids || [];
+    if (currentTrackIds.includes(track.backendId)) return;
+    try {
+      const token = localStorage.getItem("token") || undefined;
+      await addTrackToAlbum(albumId, track.backendId, token);
+      setAllAlbums((current) => current.map((item) => item.id === albumId ? { ...item, track_ids: [...(item.track_ids || []), track.backendId!] } : item));
+      setPlaylists((current) => current.map((item) => item.type === "Album" && item.backendId === albumId && !item.trackIds.includes(trackId) ? { ...item, trackIds: [...item.trackIds, trackId] } : item));
+    } catch (error) {
+      console.error("Failed to add track to album:", error);
+    }
+  };
+
+  const getAudioDuration = (file: File) => new Promise<number>((resolve) => {
+    const objectUrl = URL.createObjectURL(file);
+    const audio = new Audio();
+    audio.preload = "metadata";
+    audio.onloadedmetadata = () => {
+      const duration = Number.isFinite(audio.duration) ? Math.max(1, Math.round(audio.duration)) : 180;
+      URL.revokeObjectURL(objectUrl);
+      resolve(duration);
+    };
+    audio.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(180);
+    };
+    audio.src = objectUrl;
+  });
+
+  const handleUpload = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!sessionUser || sessionUser.role !== "artist") {
+      setUploadMessage("Публиковать музыку могут только аккаунты артиста.");
+      return;
+    }
     if (!uploadTitle.trim() || uploadFiles.length === 0) {
       setUploadMessage("Укажи название и выбери аудиофайл.");
       return;
     }
-    setUploadMessage("Файлы выбраны. Для публикации на сервере нужен подключённый backend; сейчас это локальный интерфейс загрузки.");
+
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setUploadMessage("Сессия закончилась. Войди в аккаунт ещё раз.");
+      return;
+    }
+
+    if (uploadCoverFile && (!uploadCoverFile.type.startsWith("image/") || uploadCoverFile.size > 5 * 1024 * 1024)) {
+      setUploadMessage("Обложка должна быть изображением размером не больше 5 МБ.");
+      return;
+    }
+
+    setUploadMessage("Загружаю аудио и сохраняю метаданные…");
+    const createdTracks: Track[] = [];
+    const createdTrackIds: string[] = [];
+    try {
+      const coverUrl = uploadCoverFile ? (await uploadCover(uploadCoverFile, token)).cover_url : "";
+      for (const [index, file] of uploadFiles.entries()) {
+        const uploaded = await uploadAudio(file, token);
+        const duration = uploaded.duration > 0 ? uploaded.duration : await getAudioDuration(file);
+        const fileTitle = file.name.replace(/\.[^.]+$/, "").trim();
+        const created = await createApiTrack({
+          title: uploadType === "track" ? uploadTitle.trim() : fileTitle || `${uploadTitle.trim()} ${index + 1}`,
+          artist: sessionUser.username,
+          album: uploadType === "album" ? uploadTitle.trim() : "",
+          genre: uploadGenre,
+          duration,
+          audio_url: uploaded.audio_url,
+          cover_url: coverUrl,
+          artist_id: sessionUser.id,
+        }, token);
+        createdTrackIds.push(created.id);
+        createdTracks.push(mapApiTrack(created, createdTracks.length, [...tracks, ...createdTracks]));
+      }
+
+      if (uploadType === "album") {
+        const createdAlbum = await createAlbum({
+          title: uploadTitle.trim(),
+          artist_id: sessionUser.id,
+          artist_name: sessionUser.username,
+          release_date: new Date().toISOString(),
+          cover_url: coverUrl,
+          genre: uploadGenre,
+          track_ids: createdTrackIds,
+        }, token);
+        setAllAlbums((current) => [...current.filter((album) => album.id !== createdAlbum.id), createdAlbum]);
+        savePlaylists([...playlists, mapApiAlbum(createdAlbum, playlists.length, [...tracks, ...createdTracks])]);
+      }
+
+      setTracks((current) => [...current, ...createdTracks]);
+      setUploadMessage(`Готово: ${createdTracks.length} ${createdTracks.length === 1 ? "трек опубликован" : "треков опубликовано"}.`);
+      setUploadFiles([]);
+      setUploadCoverFile(null);
+      setUploadGenre("Electronic");
+      setUploadTitle("");
+      setUploadOpen(false);
+    } catch (error) {
+      if (createdTracks.length) setTracks((current) => [...current, ...createdTracks]);
+      setUploadMessage(error instanceof Error ? error.message : "Не удалось загрузить музыку.");
+    }
   };
 
   const handlePlayTrack = async (id: number) => {
     const track = tracks.find((item) => item.id === id);
     if (track) await playTrack(track);
   };
+
+  if (!sessionUser) {
+    return (
+      <>
+        <LandingPage
+          theme={theme}
+          onSignUp={() => { setAuthMode("signUp"); setAuthOpen(true); }}
+          onSignIn={() => { setAuthMode("signIn"); setAuthOpen(true); }}
+          onToggleTheme={() => { const nextTheme = theme === "light" ? "dark" : "light"; setTheme(nextTheme); localStorage.setItem("rhythmic-theme", nextTheme); }}
+        />
+        <AuthDialog open={authOpen} mode={authMode} theme={theme} onModeChange={setAuthMode} onClose={() => setAuthOpen(false)} onAuthenticated={(response) => { setSessionUser(withSavedProfile(response.user)); setAuthOpen(false); }} />
+      </>
+    );
+  }
 
   return (
     <div className="app-shell min-h-screen bg-[#202020] text-white" data-theme={theme}>
@@ -294,7 +645,7 @@ export default function App() {
                 Home
               </NavItem>
 
-              <NavItem icon={Compass} onClick={() => openPage("home")}>Explore</NavItem>
+              <NavItem icon={Compass} active={page === "explore"} onClick={() => openPage("explore")}>Explore</NavItem>
 
               <NavItem icon={Bell} active={page === "notifications"} onClick={() => openPage("notifications")}>Notifications</NavItem>
             </div>
@@ -323,27 +674,27 @@ export default function App() {
                 Share your sound with the world.
               </p>
 
-              <button onClick={() => { setUploadType("track"); setUploadOpen(true); }} className="upload-track-button mt-4 w-full rounded-xl bg-pink-400 py-2 text-xs font-semibold text-[#191714] transition hover:bg-pink-300">Upload track / album</button>
+              {sessionUser?.role === "artist" ? <button onClick={() => { setUploadType("track"); setUploadMessage(""); setUploadFiles([]); setUploadCoverFile(null); setUploadGenre("Electronic"); setUploadOpen(true); }} className="upload-track-button mt-4 w-full rounded-xl bg-pink-200 py-2 text-xs font-semibold text-black transition hover:bg-pink-100">Upload track / album</button> : <p className="mt-3 text-[10px] leading-4 text-zinc-600">Artist accounts can publish music.</p>}
             </div>
 
             <button
-              onClick={() => setPage("profile")}
+              onClick={() => { setSelectedProfileName(sessionUser.username); setPage("profile"); }}
               className="group w-full rounded-2xl border border-white/[0.07] bg-white/[0.035] p-3 text-left transition hover:border-pink-400/20 hover:bg-pink-400/[0.05]"
             >
               <div className="flex items-center gap-3">
                 <div className="relative">
-                  <ArtistAvatar size="small" />
+                  <ArtistAvatar size="small" avatarUrl={avatarUrl} showArtistDefault={sessionUser?.role === "artist" && sessionUser.username.trim().toLowerCase() === "королевски 17"} />
                   <span className="absolute bottom-0.5 right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[#242424] bg-pink-300" />
                 </div>
 
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
                     <p className="truncate text-sm font-semibold text-white">
-                      королевски 17
+                      {sessionUser?.username || "Rhythmic listener"}
                     </p>
                   </div>
                   <p className="mt-0.5 truncate text-[10px] text-zinc-600">
-                    View profile · Artist
+                    View profile · {sessionUser?.role === "artist" ? "Artist" : "Listener"}
                   </p>
                 </div>
 
@@ -395,7 +746,7 @@ export default function App() {
               >
                 Home
               </NavItem>
-              <NavItem icon={Compass} onClick={() => openPage("home")}>Explore</NavItem>
+              <NavItem icon={Compass} active={page === "explore"} onClick={() => openPage("explore")}>Explore</NavItem>
               <NavItem icon={Bell} onClick={() => openPage("notifications")}>Notifications</NavItem>
               <NavItem icon={Library} onClick={() => openPage("library")}>Library</NavItem>
               <NavItem icon={ListMusic} onClick={() => openPage("playlists")}>Playlists / albums</NavItem>
@@ -404,15 +755,16 @@ export default function App() {
 
             <button
               onClick={() => {
+                setSelectedProfileName(sessionUser.username);
                 setPage("profile");
                 setMobileMenu(false);
               }}
               className="absolute bottom-5 left-5 right-5 flex items-center gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.035] p-3 text-left transition hover:border-pink-400/20 hover:bg-pink-400/[0.05]"
             >
-              <ArtistAvatar size="small" />
+              <ArtistAvatar size="small" avatarUrl={avatarUrl} showArtistDefault={sessionUser?.role === "artist" && sessionUser.username.trim().toLowerCase() === "королевски 17"} />
               <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-white">королевски 17</p>
-                <p className="mt-0.5 truncate text-[10px] text-zinc-600">View profile · Artist</p>
+                <p className="truncate text-sm font-semibold text-white">{sessionUser?.username || "Rhythmic listener"}</p>
+                <p className="mt-0.5 truncate text-[10px] text-zinc-600">View profile · {sessionUser?.role === "artist" ? "Artist" : "Listener"}</p>
               </div>
             </button>
           </aside>
@@ -443,33 +795,7 @@ export default function App() {
           </button>
 
           
-          <div className="header-search-container absolute left-1/2 top-1/2 z-10 w-[min(500px,45vw)] -translate-x-1/2 -translate-y-1/2 max-lg:hidden">
-            <div className="header-search-surface relative rounded-xl">
-              <Search
-                size={17}
-                className="header-search-icon absolute left-4 top-1/2 -translate-y-1/2"
-              />
-
-              <input
-                placeholder="Search tracks, artists and genres..."
-                className="header-search-input h-11 w-full rounded-xl border border-white/[0.07] pl-11 pr-4 text-sm outline-none transition placeholder:text-zinc-500 focus:border-pink-400/30"
-              />
-            </div>
-          </div>
-
-          
-          <div className="header-mobile-search ml-3 flex flex-1 lg:hidden">
-            <div className="relative w-full max-w-[300px]">
-              <Search
-                size={16}
-                className="header-search-icon absolute left-3 top-1/2 -translate-y-1/2"
-              />
-              <input
-                placeholder="Search..."
-                className="header-search-input h-10 w-full rounded-xl border border-white/[0.06] pl-9 text-sm outline-none placeholder:text-zinc-500"
-              />
-            </div>
-          </div>
+          <HeaderSearch tracks={tracks} value={searchQuery} onChange={setSearchQuery} onPlay={(id) => void handlePlayTrack(id)} onExplore={() => openPage("explore")} onOpenArtist={openArtistPage} />
 
           
           <div className="ml-auto flex items-center gap-2">
@@ -482,38 +808,79 @@ export default function App() {
             >
               {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
             </button>
-            <button onClick={() => { setAuthMode("signIn"); setAuthOpen(true); }} className="header-action-button hidden rounded-xl px-4 py-2 text-sm transition hover:bg-white/[0.04] sm:block">
-              Sign in
-            </button>
-
-            <button onClick={() => { setAuthMode("signUp"); setAuthOpen(true); }} className="header-action-button rounded-xl bg-pink-200 px-4 py-2 text-sm font-semibold transition hover:bg-pink-300">
-              Sign up
-            </button>
+            {sessionUser ? <><span className="hidden max-w-32 truncate text-xs text-zinc-500 sm:block">{sessionUser.username}</span><button onClick={() => { localStorage.removeItem("token"); localStorage.removeItem("user"); setSessionUser(null); setPlaylistType("Playlist"); setAuthMode("signIn"); setPage("home"); setSelectedProfileName(""); }} className="header-action-button rounded-xl border border-white/[0.08] px-4 py-2 text-sm transition hover:border-pink-300/30">Sign out</button></> : <><button onClick={() => { setAuthMode("signIn"); setAuthOpen(true); }} className="header-action-button hidden rounded-xl px-4 py-2 text-sm transition hover:bg-white/[0.04] sm:block">Sign in</button><button onClick={() => { setAuthMode("signUp"); setAuthOpen(true); }} className="header-action-button rounded-xl bg-pink-200 px-4 py-2 text-sm font-semibold transition hover:bg-pink-100">Sign up</button></>}
           </div>
         </header>
 
         <div key={page} className="page-transition">
-        {page === "library" || page === "liked" || page === "notifications" || page === "playlists" ? (
+        {page === "explore" ? (
+          <ExplorePage tracks={tracks} query={searchQuery} playingId={playingId} likedIds={likedIds} onPlay={(id) => void handlePlayTrack(id)} onLike={toggleLikeTrack} onOpenArtist={openArtistPage} />
+        ) : page === "library" || page === "liked" || page === "notifications" || page === "playlists" ? (
           <MusicPages
             page={page}
             tracks={tracks}
             likedIds={likedIds}
             playlists={playlists}
             playingId={playingId}
-            audioError={audioError}
+            selectedPlaylistId={selectedPlaylistId}
             onPageChange={openPage}
+            onOpenPlaylist={(id) => { setSelectedPlaylistId(id || null); if (id) setPage("playlists"); }}
             onPlay={(id) => void handlePlayTrack(id)}
             onLike={toggleLikeTrack}
-            onCreatePlaylist={() => setPlaylistDialog(true)}
-            onDeletePlaylist={(id) => savePlaylists(playlists.filter((item) => item.id !== id))}
-            onTogglePlaylistTrack={(playlistId, trackId) => savePlaylists(playlists.map((item) => item.id === playlistId ? { ...item, trackIds: item.trackIds.includes(trackId) ? item.trackIds.filter((id) => id !== trackId) : [...item.trackIds, trackId] } : item))}
+            onCreatePlaylist={() => { setPlaylistDialog(true); }}
+            onDeletePlaylist={(id) => void handleDeletePlaylist(id)}
+            onTogglePlaylistTrack={(playlistId, trackId) => void handleTogglePlaylistTrack(playlistId, trackId)}
+            onOpenAlbum={openAlbumPage}
+            onOpenArtist={openArtistPage}
           />
+        ) : page === "artist" ? (
+          <ArtistPage
+            artistName={selectedProfileName || sessionUser.username}
+            tracks={tracks.filter((track) => track.artist.toLowerCase() === (selectedProfileName || sessionUser.username).toLowerCase())}
+            albums={allAlbums.filter((album) => album.artist_name.toLowerCase() === (selectedProfileName || sessionUser.username).toLowerCase())}
+            playingId={playingId}
+            likedIds={likedIds}
+            onBack={() => openPage("explore")}
+            onPlay={(id) => void handlePlayTrack(id)}
+            onLike={toggleLikeTrack}
+            onOpenAlbum={openAlbumPage}
+            onOpenArtist={openArtistPage}
+          />
+        ) : page === "album" ? (
+          allAlbums.find((album) => album.id === selectedAlbumId) ? <AlbumDetailPage
+            album={allAlbums.find((album) => album.id === selectedAlbumId)!}
+            tracks={tracks}
+            playingId={playingId}
+            likedIds={likedIds}
+            onBack={() => setPage(albumReturnPage)}
+            onPlay={(id) => void handlePlayTrack(id)}
+            onLike={toggleLikeTrack}
+            isSaved={!!selectedAlbumId && (savedAlbumIds.includes(selectedAlbumId) || allAlbums.some((album) => album.id === selectedAlbumId && album.artist_id === sessionUser.id))}
+            onToggleLibrary={() => { if (selectedAlbumId) handleToggleAlbumLibrary(selectedAlbumId); }}
+            canAddTracks={sessionUser.role === "artist" && allAlbums.some((album) => album.id === selectedAlbumId && album.artist_id === sessionUser.id)}
+            onAddTrack={(trackId) => { if (selectedAlbumId) void handleAddTrackToAlbum(selectedAlbumId, trackId); }}
+            onOpenArtist={openArtistPage}
+          /> : <div className="px-8 py-16 text-sm text-zinc-500">Альбом не найден.</div>
         ) : page === "profile" ? (
           <ProfilePage
-            tracks={tracks}
+            displayName={selectedProfileName || sessionUser.username}
+            bio={(selectedProfileName || sessionUser.username).toLowerCase() === sessionUser.username.toLowerCase() ? profileBio : ""}
+            isOwnProfile={(selectedProfileName || sessionUser.username).toLowerCase() === sessionUser.username.toLowerCase()}
+            isArtistProfile={(selectedProfileName || sessionUser.username).toLowerCase() !== sessionUser.username.toLowerCase() || sessionUser.role === "artist"}
+            tracks={tracks.filter((track) => (selectedProfileName || sessionUser.username).toLowerCase() === sessionUser.username.toLowerCase() ? (track.artistId === sessionUser.id || track.artist.toLowerCase() === sessionUser.username.toLowerCase()) : track.artist.toLowerCase() === (selectedProfileName || sessionUser.username).toLowerCase())}
+            albums={allAlbums.filter((album) => (selectedProfileName || sessionUser.username).toLowerCase() === sessionUser.username.toLowerCase() ? album.artist_id === sessionUser.id : album.artist_name.toLowerCase() === (selectedProfileName || sessionUser.username).toLowerCase())}
+            playlists={playlists.filter((item) => item.type === "Playlist")}
             currentId={currentId}
             isPlaying={isPlaying}
+            avatarUrl={(selectedProfileName || sessionUser.username).toLowerCase() === sessionUser.username.toLowerCase() ? avatarUrl : null}
+            defaultAvatar={sessionUser.role === "artist" && (selectedProfileName || sessionUser.username).toLowerCase() === "королевски 17"}
+            canEditAvatar={(selectedProfileName || sessionUser.username).toLowerCase() === sessionUser.username.toLowerCase()}
+            onAvatarChange={handleAvatarChange}
+            onSaveProfile={handleSaveProfile}
             onPlayTrack={(id) => void handlePlayTrack(id)}
+            onOpenAlbum={openAlbumPage}
+            onOpenPlaylist={(id) => { setSelectedPlaylistId(id); setPage("playlists"); }}
+            onOpenArtist={openArtistPage}
           />
         ) : (
           <>
@@ -540,12 +907,12 @@ export default function App() {
             </p>
 
             <div className="mt-8 flex flex-wrap gap-3">
-              <button className="flex items-center gap-2 rounded-xl bg-pink-400 px-5 py-3 text-sm font-semibold text-black transition hover:bg-pink-300">
+              <button onClick={() => openPage("explore")} className="flex items-center gap-2 rounded-xl bg-pink-200 px-5 py-3 text-sm font-semibold text-black transition hover:bg-pink-100">
                 <Play size={16} fill="currentColor" />
                 Start listening
               </button>
 
-              <button className="rounded-xl border border-white/[0.08] bg-white/[0.02] px-5 py-3 text-sm text-zinc-400 transition hover:bg-white/[0.05] hover:text-white">
+              <button onClick={() => openPage("explore")} className="rounded-xl border border-white/[0.08] bg-white/[0.02] px-5 py-3 text-sm text-zinc-400 transition hover:bg-white/[0.05] hover:text-white">
                 Explore genres
               </button>
             </div>
@@ -567,7 +934,7 @@ export default function App() {
                 </h2>
               </div>
 
-              <button className="text-xs text-zinc-600 transition hover:text-pink-400">
+              <button onClick={() => openPage("explore")} className="text-xs text-zinc-600 transition hover:text-pink-400">
                 View all
               </button>
             </div>
@@ -582,7 +949,8 @@ export default function App() {
                     liked={likedIds.includes(track.id)}
                     onPlay={() => handlePlayTrack(track.id)}
                     onLike={() => toggleLikeTrack(track.id)}
-                            />
+                    onOpenArtist={openArtistPage}
+                  />
                 ))}
               </div>
             </div>
@@ -604,6 +972,7 @@ export default function App() {
               {genres.map((genre) => (
                 <button
                   key={genre.name}
+                  onClick={() => openPage("explore")}
                   className="group relative overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5 text-left transition hover:-translate-y-0.5 hover:border-white/[0.1] hover:bg-white/[0.04]"
                 >
                   <div
@@ -643,6 +1012,7 @@ export default function App() {
         theme={theme}
         onModeChange={setAuthMode}
         onClose={() => setAuthOpen(false)}
+        onAuthenticated={(response) => { setSessionUser(withSavedProfile(response.user)); if (response.user.role !== "artist") setPlaylistType("Playlist"); setAuthOpen(false); }}
       />
 
       <PlaylistDialog
@@ -652,35 +1022,31 @@ export default function App() {
         onNameChange={setPlaylistName}
         onTypeChange={setPlaylistType}
         onClose={() => setPlaylistDialog(false)}
-        onCreate={() => {
-          if (!playlistName.trim()) return;
-          savePlaylists([...playlists, { id: Date.now(), name: playlistName.trim(), type: playlistType, trackIds: currentId ? [currentId] : [] }]);
-          setPlaylistName("");
-          setPlaylistDialog(false);
-        }}
-        userId={localStorage.getItem("user") ? JSON.parse(localStorage.getItem("user") || "{}").id : undefined}
+        onCreate={() => { void handleCreatePlaylist(); }}
+        canCreateAlbum={sessionUser.role === "artist"}
       />
 
       <UploadMusicDialog
         open={uploadOpen}
         type={uploadType}
         title={uploadTitle}
-        artist={uploadArtist}
+        artistName={sessionUser.username}
         files={uploadFiles}
+        coverFile={uploadCoverFile}
+        genre={uploadGenre}
         message={uploadMessage}
         onTypeChange={setUploadType}
         onTitleChange={setUploadTitle}
-        onArtistChange={setUploadArtist}
         onFilesChange={setUploadFiles}
+        onCoverChange={setUploadCoverFile}
+        onGenreChange={setUploadGenre}
         onClose={() => { setUploadOpen(false); setUploadMessage(""); }}
         onSubmit={handleUpload}
-        userId={localStorage.getItem("user") ? JSON.parse(localStorage.getItem("user") || "{}").id : undefined}
       />
 
       
       <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-white/[0.07] bg-[#202020]/98 backdrop-blur-2xl lg:left-[250px]">
         <div className="relative mx-auto max-w-[1600px] px-4 py-3 lg:px-6">
-          {audioError && <div className="mb-2 rounded-xl border border-red-400/10 bg-red-400/[0.04] px-3 py-2 text-[10px] text-red-300">{audioError}</div>}
           <Equalizer open={eqOpen} onClose={() => setEqOpen(false)} preset={preset} bands={bands} presets={presets} onPreset={selectPreset} onBand={setBand} engine={engine} />
 
           <div className="grid grid-cols-[minmax(280px,1fr)_auto_minmax(280px,1fr)] items-center gap-6">
@@ -693,9 +1059,9 @@ export default function App() {
                   {currentTrack.title}
                 </p>
 
-                <p className="mt-1 truncate text-xs text-zinc-500">
+                <button type="button" onClick={() => openArtistPage(currentTrack.artist)} className="mt-1 block max-w-full truncate text-left text-xs text-zinc-500 transition hover:text-pink-300 hover:underline" aria-label={`Open artist ${currentTrack.artist}`}>
                   {currentTrack.artist}
-                </p>
+                </button>
 
                 <div className="mt-2">
                   <span className="rounded-full bg-white/[0.04] px-2 py-1 text-[9px] text-zinc-600">
@@ -723,7 +1089,7 @@ export default function App() {
                       (playlist) => (
                         <button
                           key={playlist}
-                          onClick={() => { setPlaylistOpen(false); savePlaylists(playlists.map((p) => p.name === playlist ? {...p, trackIds: p.trackIds.includes(currentTrack.id) ? p.trackIds : [...p.trackIds, currentTrack.id]} : p)); }}
+                          onClick={() => { setPlaylistOpen(false); if (playlist === "Liked songs") { if (!likedIds.includes(currentTrack.id)) toggleLikeTrack(currentTrack.id); } else { const target = playlists.find((item) => item.name === playlist); if (target && !target.trackIds.includes(currentTrack.id)) void handleTogglePlaylistTrack(target.id, currentTrack.id); } }}
                           className="w-full rounded-xl px-3 py-2 text-left text-xs text-zinc-400 transition hover:bg-white/[0.05] hover:text-white"
                         >
                           {playlist}

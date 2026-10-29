@@ -7,6 +7,7 @@ type CreateTrackRequest struct {
 	Genre    string `json:"genre" binding:"max=100"`
 	Duration int    `json:"duration" binding:"required,min=1"`
 	AudioURL string `json:"audio_url" binding:"required,url,max=2048"`
+	CoverURL string `json:"cover_url" binding:"omitempty,url,max=2048"`
 	ArtistID string `json:"artist_id" binding:"required"`
 }
 
@@ -17,6 +18,7 @@ type UpdateTrackRequest struct {
 	Genre    string `json:"genre" binding:"omitempty,max=100"`
 	Duration int    `json:"duration" binding:"omitempty,min=1"`
 	AudioURL string `json:"audio_url" binding:"omitempty,url,max=2048"`
+	CoverURL string `json:"cover_url" binding:"omitempty,url,max=2048"`
 	ArtistID string `json:"artist_id" binding:"omitempty"`
 }
 
@@ -33,6 +35,7 @@ type TrackView struct {
 	Genre       string `json:"genre"`
 	Duration    int    `json:"duration"`
 	AudioURL    string `json:"audio_url"`
+	CoverURL    string `json:"cover_url"`
 	ArtistID    string `json:"artist_id"`
 	ListenCount int    `json:"listen_count"`
 	LikesCount  int    `json:"likes_count"`

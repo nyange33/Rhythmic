@@ -6,7 +6,11 @@ export interface Track {
   artist: string;
   album: string;
   duration: number;
+  genre: string;
+  listen_count: number;
+  likes_count: number;
   audio_url: string;
+  cover_url: string;
   artist_id: string;
   created_at: string;
 }
@@ -15,8 +19,10 @@ export interface CreateTrackRequest {
   title: string;
   artist: string;
   album?: string;
+  genre?: string;
   duration: number;
   audio_url: string;
+  cover_url?: string;
   artist_id: string;
 }
 
@@ -24,8 +30,10 @@ export interface UpdateTrackRequest {
   title?: string;
   artist?: string;
   album?: string;
+  genre?: string;
   duration?: number;
   audio_url?: string;
+  cover_url?: string;
   artist_id?: string;
 }
 
@@ -80,4 +88,25 @@ export async function deleteTrack(id: string, token?: string): Promise<void> {
 
 export async function getTracksByArtist(artistId: string): Promise<Track[]> {
   return request<Track[]>(`/tracks/artist/${artistId}`);
+}
+
+export interface UploadAudioResponse {
+  audio_url: string;
+  duration: number;
+}
+
+export async function uploadAudio(file: File, token: string): Promise<UploadAudioResponse> {
+  const formData = new FormData();
+  formData.append("audio", file);
+  return requestWithAuth<UploadAudioResponse>("/tracks/upload", { method: "POST", body: formData }, token);
+}
+
+export interface UploadCoverResponse {
+  cover_url: string;
+}
+
+export async function uploadCover(file: File, token: string): Promise<UploadCoverResponse> {
+  const formData = new FormData();
+  formData.append("cover", file);
+  return requestWithAuth<UploadCoverResponse>("/tracks/upload-cover", { method: "POST", body: formData }, token);
 }

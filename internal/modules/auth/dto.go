@@ -7,14 +7,21 @@ type RegisterRequest struct {
 	Role     string `json:"role"`
 }
 
+type UpdateProfileRequest struct {
+	Username string `json:"username" binding:"required,min=3,max=32"`
+	Bio      string `json:"bio" binding:"max=1000"`
+}
+
 type LoginRequest struct {
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required"`
+	Identifier string `json:"identifier"`
+	Email      string `json:"email"`
+	Password   string `json:"password" binding:"required"`
 }
 
 type UserView struct {
 	ID        string `json:"id"`
 	Username  string `json:"username"`
+	Bio       string `json:"bio"`
 	Email     string `json:"email"`
 	Role      string `json:"role"`
 	CreatedAt string `json:"created_at"`

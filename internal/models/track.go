@@ -11,6 +11,7 @@ type Track struct {
 	Genre       string    `json:"genre" bson:"genre"`
 	Duration    int       `json:"duration" bson:"duration"` // в секундах
 	AudioURL    string    `json:"audio_url" bson:"audio_url"`
+	CoverURL    string    `json:"cover_url" bson:"cover_url"`
 	ArtistID    string    `json:"artist_id" bson:"artist_id"`
 	ListenCount int       `json:"listen_count" bson:"listen_count"`
 	LikesCount  int       `json:"likes_count" bson:"likes_count"`

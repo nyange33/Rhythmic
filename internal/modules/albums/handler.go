@@ -5,7 +5,9 @@ import (
 	"net/http"
 	"time"
 
+	"Rhythmic/internal/middleware"
 	"Rhythmic/internal/models"
+	"Rhythmic/internal/modules/auth"
 	"Rhythmic/internal/storage"
 
 	"github.com/gin-gonic/gin"
@@ -19,16 +21,15 @@ func NewService(albums storage.AlbumRepository) *Service {
 	return &Service{albums: albums}
 }
 
-func RegisterRoutes(rg *gin.RouterGroup, svc *Service) {
+func RegisterRoutes(rg *gin.RouterGroup, svc *Service, authSvc *auth.Service) {
 	g := rg.Group("/albums")
 	g.GET("", func(c *gin.Context) { handleGetAllAlbums(c, svc) })
 	g.GET("/artist/:artist_id", func(c *gin.Context) { handleGetAlbumsByArtist(c, svc) })
 	g.GET("/:id", func(c *gin.Context) { handleGetAlbum(c, svc) })
-	g.POST("", func(c *gin.Context) { handleCreateAlbum(c, svc) })
-	g.PUT("/:id", func(c *gin.Context) { handleUpdateAlbum(c, svc) })
-	g.DELETE("/:id", func(c *gin.Context) { handleDeleteAlbum(c, svc) })
-	g.POST("/:id/tracks", func(c *gin.Context) { handleAddTrack(c, svc) })
-	g.DELETE("/:id/tracks/:track_id", func(c *gin.Context) { handleRemoveTrack(c, svc) })
+	protected := rg.Group("/albums")
+	protected.Use(auth.RequireAuth(authSvc), middleware.RequireArtistRole())
+	protected.POST("", func(c *gin.Context) { handleCreateAlbum(c, svc) })
+	protected.POST("/:id/tracks", func(c *gin.Context) { handleAddTrack(c, svc) })
 }
 
 func handleGetAllAlbums(c *gin.Context, svc *Service) {
@@ -68,6 +69,15 @@ func handleCreateAlbum(c *gin.Context, svc *Service) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
+	userValue, exists := c.Get("user")
+	user, ok := userValue.(models.User)
+	if !exists || !ok || user.Role != models.RoleArtist {
+		c.JSON(http.StatusForbidden, gin.H{"error": "artist account required"})
+		return
+	}
+	req.ArtistID = user.ID
+	req.ArtistName = user.Username
 
 	releaseDate, err := time.Parse(time.RFC3339, req.ReleaseDate)
 	if err != nil {
@@ -115,6 +125,25 @@ func handleDeleteAlbum(c *gin.Context, svc *Service) {
 }
 
 func handleAddTrack(c *gin.Context, svc *Service) {
+	userValue, exists := c.Get("user")
+	user, ok := userValue.(models.User)
+	if !exists || !ok || user.Role != models.RoleArtist {
+		c.JSON(http.StatusForbidden, gin.H{"error": "artist account required"})
+		return
+	}
+	album, albumErr := svc.GetByID(c.Param("id"))
+	if albumErr != nil {
+		if errors.Is(albumErr, storage.ErrNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "album not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get album"})
+		return
+	}
+	if album.ArtistID != user.ID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "only the album artist can add tracks"})
+		return
+	}
 	var req AddTrackRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
